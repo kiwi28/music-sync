@@ -20,13 +20,16 @@ export async function createServerClient(): Promise<PocketBase> {
   // Load auth from cookie
   const authCookie = cookieStore.get("pb_auth");
   if (authCookie) {
-    console.log("DEBUG cookie raw value (first 80 chars):", authCookie.value.substring(0, 80));
+    console.log("DEBUG cookie length:", authCookie.value.length);
+    console.log("DEBUG cookie full:", authCookie.value);
     try {
       pb.authStore.loadFromCookie(authCookie.value);
-      console.log("DEBUG createServerClient: isValid after load =", pb.authStore.isValid);
-      console.log("DEBUG createServerClient: token =", pb.authStore.token ? "present" : "absent");
-      // Always try to refresh — PocketBase authRefresh handles expired tokens
-      if (pb.authStore.token) {
+      console.log("DEBUG loadFromCookie OK, token =", pb.authStore.token ? "present" : "absent", "isValid =", pb.authStore.isValid);
+    } catch (e: any) {
+      console.log("DEBUG loadFromCookie ERROR:", e.message);
+    }
+    // Only now try to refresh if we have a token
+    if (pb.authStore.token) {
         try {
           await pb.collection("users").authRefresh();
           console.log("DEBUG createServerClient: authRefresh succeeded, isValid now =", pb.authStore.isValid);
