@@ -1,0 +1,125 @@
+<h2>Sync Dashboard — React App Layout</h2>
+<p class="subtitle">The web interface at :3001 — paste URLs, watch progress, browse history</p>
+
+<div class="section">
+  <h3>Option A: Single-Page Dashboard</h3>
+  <div class="mockup">
+    <div class="mockup-header" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🎧 Music Sync Dashboard</span>
+      <span style="font-size:11px;opacity:0.7">🔒 Logged in as admin</span>
+    </div>
+    <div class="mockup-body" style="padding:10px">
+
+      <!-- URL Input Area -->
+      <div style="border:2px dashed #6366f1;border-radius:8px;padding:16px;margin-bottom:12px;background:#1e1b4b10">
+        <div style="font-weight:bold;margin-bottom:8px;font-size:13px">📥 New Download</div>
+        <div class="mock-input" style="margin-bottom:8px">https://open.spotify.com/playlist/37i9dQZF1DXcBWIG...</div>
+        <div style="display:flex;gap:8px;align-items:center;font-size:11px">
+          <span>📁 Save to:</span>
+          <select style="padding:4px 8px;border-radius:4px;border:1px solid #444;background:#1a1a1a;color:#eee">
+            <option>Auto (Artist/Album)</option>
+            <option>🎸 Rock Collection</option>
+            <option>🏋️ Workout Mix</option>
+            <option>🆕 New Discoveries</option>
+          </select>
+          <button class="mock-button" style="margin-left:auto">+ Add URL</button>
+          <button class="mock-button" style="background:#6366f1;border:none">⬇️ Start Download</button>
+        </div>
+        <div style="font-size:10px;color:#888;margin-top:6px">
+          📎 Or drop .url files / paste multiple URLs (one per line)
+        </div>
+      </div>
+
+      <!-- Active Jobs -->
+      <div style="margin-bottom:12px">
+        <div style="font-weight:bold;margin-bottom:8px;font-size:13px">⚡ Active Jobs</div>
+        <div style="border:1px solid #f59e0b;border-radius:6px;padding:10px;margin-bottom:6px;background:#78350f20">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:bold">🎵 Summer Vibes Playlist</span>
+            <span style="font-size:10px;color:#f59e0b">⏳ Downloading</span>
+          </div>
+          <div style="background:#333;border-radius:4px;height:6px;margin-bottom:4px">
+            <div style="background:#f59e0b;height:100%;width:65%;border-radius:4px"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:#888">
+            <span>31/48 tracks · 3 skipped (existing)</span>
+            <span>~4 min remaining</span>
+          </div>
+        </div>
+        <div style="border:1px solid #6366f1;border-radius:6px;padding:10px;background:#1e1b4b20">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:bold">🎸 Classic Rock Album</span>
+            <span style="font-size:10px;color:#6366f1">🔄 Queued</span>
+          </div>
+          <div style="font-size:10px;color:#888">12 tracks · 📁 Auto → Artist/Album</div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div>
+        <div style="font-weight:bold;margin-bottom:8px;font-size:13px">📋 Recent History</div>
+        <div style="font-size:10px;color:#888;margin-bottom:4px">Last 24 hours</div>
+        <div style="border-bottom:1px solid #222;padding:4px 0;font-size:11px;display:flex;justify-content:space-between">
+          <span>✅ <b>Chill Lo-Fi</b> · 23 tracks · 📁 New Discoveries</span><span style="color:#888">2 hours ago</span>
+        </div>
+        <div style="border-bottom:1px solid #222;padding:4px 0;font-size:11px;display:flex;justify-content:space-between">
+          <span>✅ <b>90s Hip Hop</b> · 18 tracks · 📁 Auto</span><span style="color:#888">5 hours ago</span>
+        </div>
+        <div style="border-bottom:1px solid #222;padding:4px 0;font-size:11px;display:flex;justify-content:space-between">
+          <span>⚠️ <b>Obscure Indie</b> · 2/8 failed · 📁 Auto</span><span style="color:#888">yesterday</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Option B: Tabbed Dashboard</h3>
+  <p class="subtitle">Separate tabs for submit, monitor, and history — less crowded if you have many jobs</p>
+  <div class="mockup">
+    <div class="mockup-header" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🎧 Music Sync</span>
+      <span style="font-size:11px;opacity:0.7">🔒 admin</span>
+    </div>
+    <div class="mockup-body" style="padding:10px">
+      <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid #6366f1">
+        <div style="padding:6px 16px;background:#6366f1;border-radius:4px 4px 0 0;font-size:12px;font-weight:bold">📥 Submit</div>
+        <div style="padding:6px 16px;font-size:12px;color:#888">⚡ Jobs <span style="background:#f59e0b;color:black;padding:1px 5px;border-radius:8px;font-size:10px">2</span></div>
+        <div style="padding:6px 16px;font-size:12px;color:#888">📋 History</div>
+        <div style="padding:6px 16px;font-size:12px;color:#888">⚙️ Folders</div>
+      </div>
+      <div style="border:2px dashed #6366f1;border-radius:8px;padding:16px;background:#1e1b4b10">
+        <div style="font-weight:bold;margin-bottom:8px;font-size:13px">Paste URLs or Upload Files</div>
+        <textarea class="mock-input" style="width:100%;height:80px;margin-bottom:8px;resize:vertical" placeholder="https://open.spotify.com/playlist/...&#10;https://youtube.com/playlist?list=...&#10;https://open.spotify.com/album/..."></textarea>
+        <div style="display:flex;gap:8px;align-items:center;font-size:11px">
+          <span>📁 Folder:</span>
+          <select style="padding:4px 8px;border-radius:4px;border:1px solid #444;background:#1a1a1a;color:#eee">
+            <option>Auto (Artist/Album)</option>
+            <option>🏋️ Workout Mix</option>
+            <option>🆕 New Discoveries</option>
+          </select>
+          <span style="margin-left:16px">📎</span>
+          <span style="font-size:10px;color:#888">Drop .url or .csv files here</span>
+          <button class="mock-button" style="margin-left:auto;background:#6366f1;border:none">⬇️ Download All</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>All-in-One Dashboard</h3>
+      <p>Everything on one scrollable page — submit, jobs, history. Great when you have 1-3 things going at once. Feels like a command center.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tabbed Layout</h3>
+      <p>Separate views for submit, active jobs, history, and folder management. Cleaner if you batch-download a lot or want to browse history without scrolling past the submit form.</p>
+    </div>
+  </div>
+</div>

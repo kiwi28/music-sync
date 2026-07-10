@@ -1,0 +1,130 @@
+<h2>Architecture Overview — Single VPS, Docker Compose</h2>
+<p class="subtitle">All components run on one VPS, sharing a Docker network and a music volume</p>
+
+<div class="section">
+  <h3>The Big Picture</h3>
+  <div class="mockup">
+    <div class="mockup-header">Docker Compose Stack — music-sync</div>
+    <div class="mockup-body" style="padding:24px;font-family:monospace;font-size:13px;line-height:1.8">
+
+      <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px;border:2px solid #6366f1;border-radius:8px;padding:14px;background:#1e1b4b20">
+          <strong>🌐 Nginx</strong><br>
+          <span style="color:#888;font-size:11px">Reverse Proxy (optional)</span><br>
+          <span style="font-size:11px">:80/:443 → routes to services</span>
+        </div>
+        <div style="flex:1;min-width:180px;border:2px solid #10b981;border-radius:8px;padding:14px;background:#064e3b20">
+          <strong>🎵 Navidrome</strong><br>
+          <span style="color:#888;font-size:11px">:4533 — Music Streaming</span><br>
+          <span style="font-size:11px">Subsonic API + Web UI</span>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px;border:2px solid #f59e0b;border-radius:8px;padding:14px;background:#78350f20">
+          <strong>🗄️ PocketBase</strong><br>
+          <span style="color:#888;font-size:11px">:8090 — DB + Auth + Realtime</span><br>
+          <span style="font-size:11px">Jobs, users, download logs</span>
+        </div>
+        <div style="flex:2;min-width:280px;border:2px solid #ef4444;border-radius:8px;padding:14px;background:#7f1d1d20">
+          <strong>⚡ Sync App (Node.js)</strong><br>
+          <span style="color:#888;font-size:11px">:3001 — Custom React App</span><br>
+          <span style="font-size:11px">API + React Dashboard + Background Worker</span>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin:16px 0;color:#888;font-size:12px">│</div>
+
+      <div style="border:2px dashed #6b7280;border-radius:8px;padding:14px;text-align:center;margin-bottom:10px">
+        <strong>💾 /music</strong> &nbsp;— shared Docker volume (bind mount)<br>
+        <span style="font-size:11px;color:#888">
+          /music/Artist/Album/Track.mp3 &nbsp;|&nbsp; /music/Custom Folder/Track.mp3
+        </span>
+      </div>
+
+      <div style="text-align:center;margin:12px 0;color:#888;font-size:12px">│</div>
+
+      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+        <div style="border:1px solid #6b7280;border-radius:6px;padding:10px;text-align:center;font-size:11px">
+          📱 Android<br><span style="color:#888">Symfonium / substreamer</span>
+        </div>
+        <div style="border:1px solid #6b7280;border-radius:6px;padding:10px;text-align:center;font-size:11px">
+          🍎 iOS<br><span style="color:#888">play:Sub / Amperfy</span>
+        </div>
+        <div style="border:1px solid #6b7280;border-radius:6px;padding:10px;text-align:center;font-size:11px">
+          🖥️ Desktop<br><span style="color:#888">Sonixd / Feishin</span>
+        </div>
+        <div style="border:1px solid #6b7280;border-radius:6px;padding:10px;text-align:center;font-size:11px">
+          🌐 Web<br><span style="color:#888">Navidrome Web UI</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Data Flow — Downloading a Playlist</h3>
+  <div class="mockup">
+    <div class="mockup-header">Step-by-step: Spotify playlist → MP3s in your library</div>
+    <div class="mockup-body" style="padding:20px;font-family:monospace;font-size:12px;line-height:2">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">1</span>
+        <strong>You</strong> paste a Spotify URL in the React dashboard
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">2</span>
+        <strong>React</strong> → POST to Node.js API → creates job in PocketBase
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">3</span>
+        <strong>Background Worker</strong> picks up job: "download playlist X to folder Y"
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">4</span>
+        <strong>spotdl</strong> fetches Spotify metadata → searches YouTube Music → downloads audio
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">5</span>
+        <strong>Dedup check:</strong> worker compares against existing files + PocketBase download log
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">6</span>
+        <strong>New tracks only</strong> → ffmpeg converts to MP3 → writes to /music/{folder}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">7</span>
+        <strong>Worker</strong> updates job progress in PocketBase → <span style="color:#10b981">realtime push to React</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="background:#6366f1;color:white;padding:2px 8px;border-radius:4px">8</span>
+        <strong>Worker</strong> triggers Navidrome scan → music appears in all your clients
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Design Choices</h3>
+  <div class="split">
+    <div class="pros-cons">
+      <div class="pros"><h4>What this architecture gives you</h4>
+        <ul>
+          <li>Navidrome = zero custom streaming code</li>
+          <li>PocketBase handles auth, DB, and realtime in one binary</li>
+          <li>Worker survives browser close — jobs keep running</li>
+          <li>3 containers, 1 docker-compose.yml, 1 VPS</li>
+          <li>GitHub Actions: SSH → pull → compose up</li>
+          <li>All open-source, all free</li>
+        </ul>
+      </div>
+      <div class="cons"><h4>Trade-offs to be aware of</h4>
+        <ul>
+          <li>Navidrome doesn't have offline download — clients do (Symfonium, play:Sub support offline caching)</li>
+          <li>spotdl depends on YouTube Music availability</li>
+          <li>Single VPS = single point of failure (mitigated by Docker restart policies)</li>
+          <li>PocketBase is still evolving (but stable enough for this)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
