@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { fetchSpotifyProfile } from "@/lib/spotify";
+import { getPublicOrigin } from "@/lib/url-utils";
 
 /**
  * GET /api/spotify/callback
@@ -17,14 +18,14 @@ export async function GET(request: Request) {
   // Check for user-denied authorization
   if (error) {
     return NextResponse.redirect(
-      new URL("/settings?error=spotify_auth_denied", request.url)
+      new URL("/settings?error=spotify_auth_denied", getPublicOrigin(request))
     );
   }
 
   // Validate required params
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL("/settings?error=missing_params", request.url)
+      new URL("/settings?error=missing_params", getPublicOrigin(request))
     );
   }
 
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   const savedState = cookieStore.get("spotify_auth_state");
   if (!savedState || savedState.value !== state) {
     return NextResponse.redirect(
-      new URL("/settings?error=csrf_mismatch", request.url)
+      new URL("/settings?error=csrf_mismatch", getPublicOrigin(request))
     );
   }
 
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
     const pb = await createServerClient();
     if (!pb.authStore.isValid) {
       return NextResponse.redirect(
-        new URL("/login?error=not_authenticated", request.url)
+        new URL("/login?error=not_authenticated", getPublicOrigin(request))
       );
     }
 
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
 
     if (!clientId || !clientSecret || !redirectUri) {
       return NextResponse.redirect(
-        new URL("/settings?error=spotify_not_configured", request.url)
+        new URL("/settings?error=spotify_not_configured", getPublicOrigin(request))
       );
     }
 
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
       const errText = await tokenResponse.text();
       console.error("Spotify token exchange failed:", errText);
       return NextResponse.redirect(
-        new URL("/settings?error=token_exchange_failed", request.url)
+        new URL("/settings?error=token_exchange_failed", getPublicOrigin(request))
       );
     }
 
@@ -92,7 +93,7 @@ export async function GET(request: Request) {
     } catch (err) {
       console.error("Failed to fetch Spotify profile:", err);
       return NextResponse.redirect(
-        new URL("/settings?error=profile_fetch_failed", request.url)
+        new URL("/settings?error=profile_fetch_failed", getPublicOrigin(request))
       );
     }
 
@@ -135,14 +136,14 @@ export async function GET(request: Request) {
 
     // 5. Redirect back to settings with success
     return NextResponse.redirect(
-      new URL("/settings?success=spotify_connected", request.url)
+      new URL("/settings?success=spotify_connected", getPublicOrigin(request))
     );
   } catch (err) {
     console.error("Spotify callback error:", err);
     return NextResponse.redirect(
       new URL(
         `/settings?error=${encodeURIComponent("internal_error")}`,
-        request.url
+        getPublicOrigin(request)
       )
     );
   }
