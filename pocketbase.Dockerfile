@@ -16,6 +16,8 @@ RUN chmod +x /entrypoint.sh
 
 RUN addgroup -S pb && adduser -S pb -G pb
 RUN mkdir -p /pb_data && chown pb:pb /pb_data
+# Store migrations outside the volume; entrypoint copies them in at startup
+COPY pb_migrations/ /pb_migrations_src/
 USER pb
 
 VOLUME ["/pb_data"]
