@@ -1,0 +1,13 @@
+node_modules
+.next
+pb_data
+.git
+.env.local
+*.md
+nginx-*.conf
+systemd/
+.dockerignore
+Dockerfile
+pocketbase.exe
+pocketbase.Dockerfile
+docker-compose.yml
