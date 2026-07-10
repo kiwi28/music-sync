@@ -20,23 +20,24 @@ export async function createServerClient(): Promise<PocketBase> {
   // Load auth from cookie
   const authCookie = cookieStore.get("pb_auth");
   if (authCookie) {
-    console.log("DEBUG cookie length:", authCookie.value.length);
-    console.log("DEBUG cookie full:", authCookie.value);
     try {
-      pb.authStore.loadFromCookie(authCookie.value);
-      console.log("DEBUG loadFromCookie OK, token =", pb.authStore.token ? "present" : "absent", "isValid =", pb.authStore.isValid);
-    } catch (e: any) {
-      console.log("DEBUG loadFromCookie ERROR:", e.message);
-    }
-    // Always try to refresh if we have a token (PocketBase handles expired tokens)
-    if (pb.authStore.token) {
-      try {
-        await pb.collection("users").authRefresh();
-        console.log("DEBUG authRefresh succeeded, isValid now =", pb.authStore.isValid);
-      } catch (e) {
-        console.log("DEBUG authRefresh failed:", e);
-        pb.authStore.clear();
+      // Manually parse cookie JSON — PocketBase SDK 0.27.x has a bug where
+      // exportToCookie writes "record" but loadFromCookie expects "model".
+      const cookieData = JSON.parse(authCookie.value);
+      const token = cookieData.token || null;
+      const model = cookieData.record || cookieData.model || null;
+      pb.authStore.save(token, model);
+
+      // Always try to refresh (PocketBase handles expired tokens)
+      if (token) {
+        try {
+          await pb.collection("users").authRefresh();
+        } catch {
+          pb.authStore.clear();
+        }
       }
+    } catch {
+      pb.authStore.clear();
     }
   }
 
