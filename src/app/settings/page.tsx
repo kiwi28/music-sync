@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/layout/providers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,37 @@ export default function SettingsPage() {
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [importingPlaylists, setImportingPlaylists] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read error/success from URL on mount, show it, and clean the URL
+  useEffect(() => {
+    const error = searchParams.get("error");
+    const success = searchParams.get("success");
+
+    if (error) {
+      const messages: Record<string, string> = {
+        spotify_auth_denied: "Spotify authorization was denied.",
+        missing_params: "Missing parameters in Spotify callback.",
+        csrf_mismatch: "Security check failed. Please try again.",
+        not_authenticated: "Your session expired. Please log in again.",
+        spotify_not_configured: "Spotify integration is not configured on the server.",
+        token_exchange_failed: "Failed to exchange Spotify authorization code.",
+        profile_fetch_failed: "Failed to fetch your Spotify profile.",
+        internal_error: "An unexpected error occurred. Please try again.",
+      };
+      setStatusMessage({ type: "error", text: messages[error] ?? `Error: ${error}` });
+    } else if (success) {
+      setStatusMessage({ type: "success", text: "Spotify connected successfully!" });
+    }
+
+    // Clean the URL
+    if (error || success) {
+      router.replace("/settings");
+    }
+  }, []);
 
   async function handleImportSpotifyPlaylists() {
     setImportingPlaylists(true);
@@ -81,6 +113,19 @@ export default function SettingsPage() {
           Manage your account and platform connections
         </p>
       </div>
+
+      {/* Status messages (from OAuth callbacks) */}
+      {statusMessage && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            statusMessage.type === "error"
+              ? "border-red-500/20 bg-red-500/10 text-red-300"
+              : "border-green-500/20 bg-green-500/10 text-green-300"
+          }`}
+        >
+          {statusMessage.text}
+        </div>
+      )}
 
       {/* Account */}
       <Card>
