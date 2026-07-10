@@ -15,6 +15,7 @@ COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 RUN addgroup -S pb && adduser -S pb -G pb
+RUN mkdir -p /pb_data && chown pb:pb /pb_data
 USER pb
 
 VOLUME ["/pb_data"]
