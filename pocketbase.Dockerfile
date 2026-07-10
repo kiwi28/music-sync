@@ -20,7 +20,7 @@ USER pb
 VOLUME ["/pb_data"]
 EXPOSE 8090
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -sf http://127.0.0.1:8090/api/health || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -sf http://127.0.0.1:8090/api/health
 
 ENTRYPOINT ["/entrypoint.sh"]
