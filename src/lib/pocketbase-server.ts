@@ -28,18 +28,15 @@ export async function createServerClient(): Promise<PocketBase> {
     } catch (e: any) {
       console.log("DEBUG loadFromCookie ERROR:", e.message);
     }
-    // Only now try to refresh if we have a token
+    // Always try to refresh if we have a token (PocketBase handles expired tokens)
     if (pb.authStore.token) {
-        try {
-          await pb.collection("users").authRefresh();
-          console.log("DEBUG createServerClient: authRefresh succeeded, isValid now =", pb.authStore.isValid);
-        } catch (e) {
-          console.log("DEBUG createServerClient: authRefresh failed:", e);
-          pb.authStore.clear();
-        }
+      try {
+        await pb.collection("users").authRefresh();
+        console.log("DEBUG authRefresh succeeded, isValid now =", pb.authStore.isValid);
+      } catch (e) {
+        console.log("DEBUG authRefresh failed:", e);
+        pb.authStore.clear();
       }
-    } catch {
-      pb.authStore.clear();
     }
   }
 
