@@ -10,11 +10,6 @@ import { getPublicOrigin } from "@/lib/url-utils";
  * Exchanges the authorization code for tokens and stores them in PocketBase.
  */
 export async function GET(request: Request) {
-  // DEBUG: log cookies arriving with the callback
-  const dbgCookieStore = await cookies();
-  console.log("DEBUG callback cookies:", dbgCookieStore.getAll().map(c => c.name).join(", "));
-  console.log("DEBUG pb_auth present:", !!dbgCookieStore.get("pb_auth"));
-
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const state = searchParams.get("state");

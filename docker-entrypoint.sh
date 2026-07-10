@@ -2,6 +2,7 @@
 set -e
 
 # Sync migrations from image into the volume (won't overwrite existing)
+mkdir -p /pb_data/pb_migrations
 cp -rn /pb_migrations_src/* /pb_data/pb_migrations/ 2>/dev/null || true
 
 # Create superuser on first run if env vars are set
