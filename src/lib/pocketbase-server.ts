@@ -20,6 +20,7 @@ export async function createServerClient(): Promise<PocketBase> {
   // Load auth from cookie
   const authCookie = cookieStore.get("pb_auth");
   if (authCookie) {
+    console.log("DEBUG cookie raw value (first 80 chars):", authCookie.value.substring(0, 80));
     try {
       pb.authStore.loadFromCookie(authCookie.value);
       console.log("DEBUG createServerClient: isValid after load =", pb.authStore.isValid);
