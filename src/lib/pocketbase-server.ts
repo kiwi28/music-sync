@@ -22,12 +22,15 @@ export async function createServerClient(): Promise<PocketBase> {
   if (authCookie) {
     try {
       pb.authStore.loadFromCookie(authCookie.value);
-      // If token exists, verify it's still valid and refresh if needed
-      if (pb.authStore.isValid) {
+      console.log("DEBUG createServerClient: isValid after load =", pb.authStore.isValid);
+      console.log("DEBUG createServerClient: token =", pb.authStore.token ? "present" : "absent");
+      // Always try to refresh — PocketBase authRefresh handles expired tokens
+      if (pb.authStore.token) {
         try {
           await pb.collection("users").authRefresh();
-        } catch {
-          // Refresh failed — clear stale auth
+          console.log("DEBUG createServerClient: authRefresh succeeded, isValid now =", pb.authStore.isValid);
+        } catch (e) {
+          console.log("DEBUG createServerClient: authRefresh failed:", e);
           pb.authStore.clear();
         }
       }
