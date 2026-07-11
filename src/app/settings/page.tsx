@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/layout/providers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,10 +26,21 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Read error/success from URL on mount, show it, and clean the URL
+  // Prevent re-processing the same params on re-renders
+  const processedKey = useRef<string | null>(null);
+
+  // Read error/success from URL, show it, and clean the URL
   useEffect(() => {
     const error = searchParams.get("error");
     const success = searchParams.get("success");
+
+    // Nothing to do
+    if (!error && !success) return;
+
+    // Already processed this exact combination
+    const key = `${error ?? ""}|${success ?? ""}`;
+    if (processedKey.current === key) return;
+    processedKey.current = key;
 
     if (error) {
       const messages: Record<string, string> = {
@@ -50,10 +61,8 @@ export default function SettingsPage() {
     }
 
     // Clean the URL
-    if (error || success) {
-      router.replace("/settings");
-    }
-  }, []);
+    router.replace("/settings");
+  }, [searchParams, router]);
 
   async function handleImportSpotifyPlaylists() {
     setImportingPlaylists(true);
