@@ -7,6 +7,9 @@ import type {
 
 const SPOTIFY_API = "https://api.spotify.com/v1";
 
+/** Default timeout for Spotify API calls (15 seconds) */
+const SPOTIFY_FETCH_TIMEOUT_MS = 15_000;
+
 /**
  * Build the Spotify OAuth authorization URL.
  * State parameter prevents CSRF — store it in a cookie and verify on callback.
@@ -61,6 +64,7 @@ export async function exchangeSpotifyCode(
       code,
       redirect_uri: redirectUri,
     }),
+    signal: AbortSignal.timeout(SPOTIFY_FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -81,6 +85,7 @@ export async function fetchSpotifyPlaylists(accessToken: string): Promise<Spotif
   while (url) {
     const response: Response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(SPOTIFY_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -108,6 +113,7 @@ export async function fetchSpotifyPlaylistTracks(
   while (url) {
     const response: Response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(SPOTIFY_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -152,6 +158,7 @@ export async function fetchSpotifyProfile(accessToken: string): Promise<{
 }> {
   const response = await fetch(`${SPOTIFY_API}/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(SPOTIFY_FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -179,6 +186,7 @@ export async function createSpotifyPlaylist(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ name, description, public: isPublic }),
+    signal: AbortSignal.timeout(SPOTIFY_FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -210,6 +218,7 @@ export async function addTracksToSpotifyPlaylist(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ uris: batch }),
+        signal: AbortSignal.timeout(SPOTIFY_FETCH_TIMEOUT_MS),
       }
     );
 

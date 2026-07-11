@@ -5,6 +5,32 @@ import { cookies } from "next/headers";
 
 const PB_URL = process.env.POCKETBASE_URL || "http://127.0.0.1:8090";
 
+/** Default timeout for PocketBase API calls (10 seconds) */
+const PB_TIMEOUT_MS = 10_000;
+
+/**
+ * Race a promise against a timeout. If the promise doesn't settle within
+ * `ms` milliseconds, the timeout rejects with the given `label`.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timeout: ${label} (${ms}ms)`)), ms);
+  });
+  try {
+    const result = await Promise.race([promise, timeout]);
+    clearTimeout(timer);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
 /**
  * Create a server-side PocketBase client.
  * Reads the pb_auth cookie and loads the session so all subsequent
@@ -29,10 +55,17 @@ export async function createServerClient(): Promise<PocketBase> {
       pb.authStore.save(token, model);
 
       // Always try to refresh (PocketBase handles expired tokens)
+      // Wrapped in a timeout — if PB is unreachable, fail fast instead of
+      // hanging until nginx gives up and returns 503.
       if (token) {
         try {
-          await pb.collection("users").authRefresh();
-        } catch {
+          await withTimeout(
+            pb.collection("users").authRefresh(),
+            PB_TIMEOUT_MS,
+            "PocketBase authRefresh",
+          );
+        } catch (err) {
+          console.error("authRefresh failed:", err instanceof Error ? err.message : err);
           pb.authStore.clear();
         }
       }
@@ -79,6 +112,7 @@ export async function refreshSpotifyToken(
       grant_type: "refresh_token",
       refresh_token: connection.refresh_token,
     }),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!response.ok) {

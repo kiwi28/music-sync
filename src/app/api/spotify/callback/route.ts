@@ -42,8 +42,17 @@ export async function GET(request: Request) {
   cookieStore.delete("spotify_auth_state");
 
   try {
-    // 1. Get server PocketBase client and verify user is logged in
-    const pb = await createServerClient();
+    // ── Step 1: PocketBase auth ──
+    let pb: Awaited<ReturnType<typeof createServerClient>>;
+    try {
+      pb = await createServerClient();
+    } catch (err) {
+      console.error("[callback:step1] createServerClient failed:", err instanceof Error ? err.message : err);
+      return NextResponse.redirect(
+        new URL("/settings?error=pb_unreachable", getPublicOrigin(request))
+      );
+    }
+
     if (!pb.authStore.isValid) {
       return NextResponse.redirect(
         new URL("/login?error=not_authenticated", getPublicOrigin(request))
@@ -52,7 +61,7 @@ export async function GET(request: Request) {
 
     const userId = pb.authStore.record!.id;
 
-    // 2. Exchange authorization code for tokens
+    // ── Step 2: Exchange authorization code for tokens ──
     const clientId = process.env.SPOTIFY_CLIENT_ID;
     const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
     const redirectUri = process.env.SPOTIFY_REDIRECT_URI;
@@ -63,83 +72,96 @@ export async function GET(request: Request) {
       );
     }
 
-    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-      }),
-    });
+    let tokens: { access_token: string; refresh_token: string; expires_in: number };
+    try {
+      const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
 
-    if (!tokenResponse.ok) {
-      const errText = await tokenResponse.text();
-      console.error("Spotify token exchange failed:", errText);
+      if (!tokenResponse.ok) {
+        const errText = await tokenResponse.text();
+        console.error("[callback:step2] Spotify token exchange failed:", tokenResponse.status, errText);
+        return NextResponse.redirect(
+          new URL("/settings?error=token_exchange_failed", getPublicOrigin(request))
+        );
+      }
+
+      tokens = await tokenResponse.json();
+    } catch (err) {
+      console.error("[callback:step2] Token exchange error:", err instanceof Error ? err.message : err);
       return NextResponse.redirect(
         new URL("/settings?error=token_exchange_failed", getPublicOrigin(request))
       );
     }
 
-    const tokens = await tokenResponse.json();
-
-    // 3. Fetch Spotify user profile to get platform user ID
+    // ── Step 3: Fetch Spotify user profile ──
     let profile: { id: string; display_name: string };
     try {
       profile = await fetchSpotifyProfile(tokens.access_token);
     } catch (err) {
-      console.error("Failed to fetch Spotify profile:", err);
+      console.error("[callback:step3] Failed to fetch Spotify profile:", err instanceof Error ? err.message : err);
       return NextResponse.redirect(
         new URL("/settings?error=profile_fetch_failed", getPublicOrigin(request))
       );
     }
 
-    // 4. Store or update the connection in PocketBase
+    // ── Step 4: Store/update connection in PocketBase ──
     const expiresAt = new Date(
       Date.now() + tokens.expires_in * 1000
     ).toISOString();
 
-    // Check for existing connection to this platform
-    const existingConnections = await pb
-      .collection("user_connections")
-      .getFullList({
-        filter: `user = "${userId}" && platform = "spotify"`,
-      });
+    try {
+      const existingConnections = await pb
+        .collection("user_connections")
+        .getFullList({
+          filter: `user = "${userId}" && platform = "spotify"`,
+        });
 
-    if (existingConnections.length > 0) {
-      // Update existing connection
-      await pb.collection("user_connections").update(
-        existingConnections[0].id,
-        {
+      if (existingConnections.length > 0) {
+        await pb.collection("user_connections").update(
+          existingConnections[0].id,
+          {
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            token_expires_at: expiresAt,
+            platform_user_id: profile.id,
+            platform_username: profile.display_name,
+          }
+        );
+      } else {
+        await pb.collection("user_connections").create({
+          user: userId,
+          platform: "spotify",
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
           token_expires_at: expiresAt,
           platform_user_id: profile.id,
           platform_username: profile.display_name,
-        }
+        });
+      }
+    } catch (err) {
+      console.error("[callback:step4] PocketBase connection upsert failed:", err instanceof Error ? err.message : err);
+      return NextResponse.redirect(
+        new URL("/settings?error=pb_write_failed", getPublicOrigin(request))
       );
-    } else {
-      // Create new connection
-      await pb.collection("user_connections").create({
-        user: userId,
-        platform: "spotify",
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        token_expires_at: expiresAt,
-        platform_user_id: profile.id,
-        platform_username: profile.display_name,
-      });
     }
 
-    // 5. Redirect back to settings with success
+    // ── Step 5: Redirect with success ──
     return NextResponse.redirect(
       new URL("/settings?success=spotify_connected", getPublicOrigin(request))
     );
   } catch (err) {
-    console.error("Spotify callback error:", err);
+    console.error("[callback:unhandled] Unexpected error:", err instanceof Error ? err.message : err);
     return NextResponse.redirect(
       new URL(
         `/settings?error=${encodeURIComponent("internal_error")}`,

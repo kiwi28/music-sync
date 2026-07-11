@@ -40,6 +40,8 @@ export default function SettingsPage() {
         spotify_not_configured: "Spotify integration is not configured on the server.",
         token_exchange_failed: "Failed to exchange Spotify authorization code.",
         profile_fetch_failed: "Failed to fetch your Spotify profile.",
+        pb_unreachable: "The database is temporarily unavailable. Please try again in a moment.",
+        pb_write_failed: "Failed to save your Spotify connection. Please try again.",
         internal_error: "An unexpected error occurred. Please try again.",
       };
       setStatusMessage({ type: "error", text: messages[error] ?? `Error: ${error}` });
