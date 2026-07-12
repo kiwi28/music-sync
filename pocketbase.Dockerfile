@@ -3,7 +3,7 @@ FROM alpine:3.21
 ARG PB_VERSION=0.28.1
 ARG TARGETARCH=amd64
 
-RUN apk add --no-cache ca-certificates curl unzip sqlite3
+RUN apk add --no-cache ca-certificates curl unzip sqlite
 
 RUN curl -L "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" \
     -o /tmp/pb.zip \
