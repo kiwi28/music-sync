@@ -17,8 +17,11 @@ migrate(($app) => {
   }));
 
   // Make platform_id optional — it's now extracted from the URL when possible,
-  // but not all URL patterns may yield a clean ID
-  const platformIdField = playlists.fields.find((f) => f.name === "platform_id");
+  // but not all URL patterns may yield a clean ID.
+  //
+  // Use getByName() — FieldsList is a Go-backed object; JS Array methods
+  // like find/filter do not exist on it.
+  const platformIdField = playlists.fields.getByName("platform_id");
   if (platformIdField) {
     platformIdField.required = false;
   }
@@ -28,10 +31,10 @@ migrate(($app) => {
   const playlists = $app.findCollectionByNameOrId("playlists");
 
   // Remove url field
-  playlists.fields = playlists.fields.filter((f) => f.name !== "url");
+  playlists.fields.removeByName("url");
 
   // Make platform_id required again
-  const platformIdField = playlists.fields.find((f) => f.name === "platform_id");
+  const platformIdField = playlists.fields.getByName("platform_id");
   if (platformIdField) {
     platformIdField.required = true;
   }
