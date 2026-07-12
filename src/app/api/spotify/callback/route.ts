@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/pocketbase-server";
 import { fetchSpotifyProfile } from "@/lib/spotify";
 import { getPublicOrigin } from "@/lib/url-utils";
 import { logApiError } from "@/lib/api-errors";
-import { setFlash } from "@/lib/flash";
+import { setFlash } from "@/lib/flash-server";
 
 const ROUTE = "spotify/callback";
 
