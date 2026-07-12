@@ -43,7 +43,7 @@ function extractPbError(err: unknown): PocketBaseErrorLike {
 
 /**
  * Log ANY external-call error with full context. Use this in library code
- * (spotify.ts, pocketbase-server.ts) as well as API routes.
+ * (pocketbase-server.ts, API routes) as well as internal utilities.
  *
  * Automatically detects PocketBase ClientResponseError and extracts its
  * nested `data` payload. For plain Errors or fetch failures, logs the

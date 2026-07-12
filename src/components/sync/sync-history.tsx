@@ -32,7 +32,7 @@ export function SyncHistory({ jobs, loading }: SyncHistoryProps) {
           </div>
         ) : jobs.length === 0 ? (
           <p className="py-6 text-center text-sm text-white/40">
-            No sync history yet. Connect a platform and sync a playlist to get started.
+            No sync history yet. Add a playlist and sync it to get started.
           </p>
         ) : (
           <div className="space-y-2">

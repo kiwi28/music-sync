@@ -4,7 +4,6 @@ import { ThemeProvider } from "next-themes";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import PocketBase, { type AuthRecord } from "pocketbase";
 import { createBrowserClient } from "@/lib/pocketbase";
-import type { UserConnection, Platform } from "@/lib/types";
 
 // ── PocketBase Context ──
 
@@ -15,9 +14,6 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, passwordConfirm: string) => Promise<void>;
   logout: () => void;
-  connections: UserConnection[];
-  refreshConnections: () => Promise<void>;
-  connectedPlatforms: Platform[];
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -32,8 +28,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const [pb] = useState(() => createBrowserClient());
   const [user, setUser] = useState<AuthRecord | null>(pb.authStore.record);
   const [loading, setLoading] = useState(true);
-  const [connections, setConnections] = useState<UserConnection[]>([]);
-  const [connectedPlatforms, setConnectedPlatforms] = useState<Platform[]>([]);
 
   // Listen for auth changes
   useEffect(() => {
@@ -66,29 +60,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, [pb]);
 
-  const refreshConnections = useCallback(async () => {
-    if (!pb.authStore.isValid) {
-      setConnections([]);
-      setConnectedPlatforms([]);
-      return;
-    }
-    try {
-      const records = await pb
-        .collection("user_connections")
-        .getFullList<UserConnection>({
-          filter: `user = "${pb.authStore.record!.id}"`,
-        });
-      setConnections(records);
-      setConnectedPlatforms(records.map((c) => c.platform as Platform));
-    } catch {
-      // User might not have access yet
-    }
-  }, [pb]);
-
-  useEffect(() => {
-    if (user) refreshConnections();
-  }, [user, refreshConnections]);
-
   const login = useCallback(
     async (email: string, password: string) => {
       await pb.collection("users").authWithPassword(email, password);
@@ -109,8 +80,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     pb.authStore.clear();
-    setConnections([]);
-    setConnectedPlatforms([]);
   }, [pb]);
 
   return (
@@ -122,9 +91,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
-        connections,
-        refreshConnections,
-        connectedPlatforms,
       }}
     >
       {children}

@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLATFORM_META, timeAgo } from "@/lib/utils";
-import type { Platform } from "@/lib/types";
 
 export default function PlaylistDetailPage({
   params,
@@ -19,7 +18,7 @@ export default function PlaylistDetailPage({
 }) {
   const { id } = use(params);
   const { playlist, loading, error } = usePlaylist(id);
-  const { pb, user, connectedPlatforms } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -38,8 +37,6 @@ export default function PlaylistDetailPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           playlistId: playlist.id,
-          platform: playlist.platform,
-          direction: "import",
         }),
       });
 
@@ -49,7 +46,6 @@ export default function PlaylistDetailPage({
       }
 
       router.refresh();
-      // Re-fetch will happen via the hook
       window.location.reload();
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : "Sync failed");
@@ -91,8 +87,6 @@ export default function PlaylistDetailPage({
     );
   }
 
-  const canSync = connectedPlatforms.includes(playlist.platform as Platform);
-
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -127,7 +121,7 @@ export default function PlaylistDetailPage({
             {playlist.description && (
               <p className="mt-1 text-sm text-white/50">{playlist.description}</p>
             )}
-            <div className="mt-2 flex items-center gap-3">
+            <div className="mt-2 flex flex-wrap items-center gap-3">
               {meta && (
                 <div className="flex items-center gap-1.5">
                   <span className={`h-1.5 w-1.5 rounded-full ${meta.color}`} />
@@ -144,8 +138,16 @@ export default function PlaylistDetailPage({
                   Last synced {timeAgo(playlist.last_synced)}
                 </Badge>
               )}
-              {playlist.is_public && (
-                <Badge variant="default">Public</Badge>
+              {playlist.url && (
+                <a
+                  href={playlist.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-white/40 underline underline-offset-4 hover:text-white/70"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Open in {meta?.label ?? "platform"} ↗
+                </a>
               )}
             </div>
           </div>
@@ -153,15 +155,9 @@ export default function PlaylistDetailPage({
 
         {/* Sync action */}
         <div className="flex flex-col items-end gap-2">
-          {canSync ? (
-            <Button onClick={handleSync} disabled={syncing}>
-              {syncing ? "Syncing…" : "Sync Now"}
-            </Button>
-          ) : (
-            <p className="text-xs text-white/30">
-              Connect {meta?.label ?? playlist.platform} in Settings to sync
-            </p>
-          )}
+          <Button onClick={handleSync} disabled={syncing}>
+            {syncing ? "Syncing…" : "Sync Now"}
+          </Button>
           {syncError && (
             <p className="text-xs text-red-400">{syncError}</p>
           )}

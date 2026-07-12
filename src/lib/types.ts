@@ -5,17 +5,6 @@ export type Platform = "spotify" | "apple_music" | "youtube_music" | "tidal" | "
 
 export type SyncStatus = "pending" | "running" | "completed" | "failed";
 
-export interface UserConnection {
-  id: string;
-  user: string;
-  platform: Platform;
-  access_token: string;
-  refresh_token: string;
-  token_expires_at: string;
-  platform_user_id: string;
-  platform_username: string;
-}
-
 export interface Track {
   id: string;
   title: string;
@@ -32,8 +21,12 @@ export interface Playlist {
   id: string;
   name: string;
   description?: string;
+  /** Public URL pasted by the user (e.g. https://open.spotify.com/playlist/...) */
+  url: string;
+  /** Auto-detected from the URL */
   platform: Platform;
-  platform_id: string;
+  /** Optional — extracted from URL when the platform pattern is known */
+  platform_id?: string;
   user: string;
   track_count?: number;
   last_synced?: string;
@@ -73,44 +66,4 @@ export interface SyncJob {
   expand?: {
     playlist?: Playlist;
   };
-}
-
-/** Spotify-specific types */
-export interface SpotifyTokenResponse {
-  access_token: string;
-  token_type: "Bearer";
-  expires_in: number;
-  refresh_token: string;
-  scope: string;
-}
-
-export interface SpotifyPlaylist {
-  id: string;
-  name: string;
-  description: string;
-  public: boolean;
-  tracks: { total: number };
-  images: { url: string; height: number; width: number }[];
-}
-
-export interface SpotifyTrack {
-  id: string;
-  name: string;
-  type: string;
-  duration_ms: number;
-  external_ids: { isrc?: string };
-  album: {
-    name: string;
-    images: { url: string; height: number; width: number }[];
-  };
-  artists: { name: string }[];
-  uri: string;
-}
-
-/** Dashboard stats */
-export interface DashboardStats {
-  totalPlaylists: number;
-  totalTracks: number;
-  connectedPlatforms: Platform[];
-  recentSyncs: SyncJob[];
 }

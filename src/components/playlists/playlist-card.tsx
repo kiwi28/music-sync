@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PLATFORM_META, timeAgo } from "@/lib/utils";
+import { PLATFORM_META, timeAgo, truncate } from "@/lib/utils";
 import type { Playlist } from "@/lib/types";
 
 interface PlaylistCardProps {
@@ -51,6 +51,11 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
                 </span>
               )}
             </div>
+            {playlist.url && (
+              <p className="mt-0.5 truncate text-[11px] text-white/20">
+                {truncate(playlist.url.replace(/^https?:\/\/(www\.)?/, ""), 45)}
+              </p>
+            )}
           </div>
 
           {/* Meta */}
@@ -62,9 +67,6 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
               <Badge variant="success">
                 Synced {timeAgo(playlist.last_synced)}
               </Badge>
-            )}
-            {playlist.is_public && (
-              <span className="text-[10px] text-white/30">Public</span>
             )}
           </div>
         </CardContent>
