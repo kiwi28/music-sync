@@ -73,16 +73,21 @@ export async function POST() {
         console.warn(`Spotify playlist "${sp.name}" (${sp.id}) has no tracks object — defaulting track_count to 0`);
       }
 
-      const playlistData = {
+      const playlistData: Record<string, unknown> = {
         name: sp.name,
         description: sp.description || "",
         platform: "spotify",
         platform_id: sp.id,
         user: userId,
         track_count: sp.tracks?.total ?? 0,
-        cover_url: sp.images?.[0]?.url || "",
         is_public: sp.public,
       };
+
+      // Only include cover_url when there is one — PocketBase `url` field
+      // rejects empty strings.
+      if (sp.images?.[0]?.url) {
+        playlistData.cover_url = sp.images[0].url;
+      }
 
       // Check if already imported
       const existing = await pb.collection("playlists").getFullList({
