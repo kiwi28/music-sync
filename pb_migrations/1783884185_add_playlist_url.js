@@ -3,11 +3,13 @@
 migrate(($app) => {
   const playlists = $app.findCollectionByNameOrId("playlists");
 
-  // Add url field (public URL pasted by the user)
+  // Add url field (public URL pasted by the user).
+  // NOT required at the DB level — existing records imported via Spotify API
+  // won't have a URL. The app enforces it for new playlists created via the dialog.
   playlists.fields.push({
     name: "url",
     type: "text",
-    required: true,
+    required: false,
     max: 500,
   });
 

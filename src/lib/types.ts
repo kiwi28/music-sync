@@ -21,8 +21,8 @@ export interface Playlist {
   id: string;
   name: string;
   description?: string;
-  /** Public URL pasted by the user (e.g. https://open.spotify.com/playlist/...) */
-  url: string;
+  /** Public URL pasted by the user (e.g. https://open.spotify.com/playlist/...). May be missing on legacy records imported via old Spotify API integration. */
+  url?: string;
   /** Auto-detected from the URL */
   platform: Platform;
   /** Optional — extracted from URL when the platform pattern is known */
