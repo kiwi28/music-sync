@@ -69,13 +69,17 @@ export async function POST() {
     let updated = 0;
 
     for (const sp of spotifyPlaylists) {
+      if (!sp.tracks) {
+        console.warn(`Spotify playlist "${sp.name}" (${sp.id}) has no tracks object — defaulting track_count to 0`);
+      }
+
       const playlistData = {
         name: sp.name,
         description: sp.description || "",
         platform: "spotify",
         platform_id: sp.id,
         user: userId,
-        track_count: sp.tracks.total,
+        track_count: sp.tracks?.total ?? 0,
         cover_url: sp.images?.[0]?.url || "",
         is_public: sp.public,
       };
