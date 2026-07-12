@@ -23,9 +23,6 @@ services:
     environment:
       - NODE_ENV=production
       - POCKETBASE_URL=http://pocketbase:8090
-      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
-      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
-      - SPOTIFY_REDIRECT_URI=${SPOTIFY_REDIRECT_URI}
       - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
     depends_on:
       pocketbase:
