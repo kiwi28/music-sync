@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerClient, refreshSpotifyToken } from "@/lib/pocketbase-server";
 import { isTokenExpired } from "@/lib/pocketbase";
 import { fetchSpotifyPlaylists } from "@/lib/spotify";
+import { logApiError, apiError } from "@/lib/api-errors";
+
+const ROUTE = "spotify/import";
 
 /**
  * POST /api/spotify/import
@@ -67,6 +70,7 @@ export async function POST() {
     // Upsert playlists into PocketBase
     let created = 0;
     let updated = 0;
+    const errors: Array<{ name: string; error: string }> = [];
 
     for (const sp of spotifyPlaylists) {
       if (!sp.tracks) {
@@ -89,32 +93,44 @@ export async function POST() {
         playlistData.cover_url = sp.images[0].url;
       }
 
-      // Check if already imported
-      const existing = await pb.collection("playlists").getFullList({
-        filter: `user = "${userId}" && platform = "spotify" && platform_id = "${sp.id}"`,
-      });
+      try {
+        // Check if already imported
+        const existing = await pb.collection("playlists").getFullList({
+          filter: `user = "${userId}" && platform = "spotify" && platform_id = "${sp.id}"`,
+        });
 
-      if (existing.length > 0) {
-        await pb.collection("playlists").update(existing[0].id, playlistData);
-        updated++;
-      } else {
-        await pb.collection("playlists").create(playlistData);
-        created++;
+        if (existing.length > 0) {
+          await pb.collection("playlists").update(existing[0].id, playlistData);
+          updated++;
+        } else {
+          await pb.collection("playlists").create(playlistData);
+          created++;
+        }
+      } catch (err) {
+        logApiError(
+          { route: ROUTE, step: `playlist "${sp.name}"`, userId, requestBody: playlistData },
+          err,
+        );
+        const pbError = err as Record<string, unknown>;
+        errors.push({
+          name: sp.name,
+          error: pbError.data
+            ? JSON.stringify(pbError.data)
+            : (pbError.message as string) || "Unknown error",
+        });
       }
     }
 
     return NextResponse.json({
-      success: true,
+      success: errors.length === 0,
       total: spotifyPlaylists.length,
       created,
       updated,
-      message: `Imported ${created} new and updated ${updated} existing playlists`,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `Imported ${created} new and updated ${updated} existing playlists${errors.length > 0 ? ` (${errors.length} failed)` : ""}`,
     });
   } catch (err) {
-    console.error("Import playlists error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Import failed" },
-      { status: 500 }
-    );
+    logApiError({ route: ROUTE, userId: "unknown" }, err);
+    return apiError(err, "Import failed");
   }
 }

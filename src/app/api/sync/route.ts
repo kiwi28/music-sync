@@ -8,6 +8,9 @@ import {
 } from "@/lib/spotify";
 import { syncPlaylistSchema } from "@/lib/validators";
 import type { Track } from "@/lib/types";
+import { logApiError, apiError } from "@/lib/api-errors";
+
+const ROUTE = "sync";
 
 /**
  * POST /api/sync
@@ -49,7 +52,8 @@ export async function POST(request: NextRequest) {
       if (playlist.user !== userId) {
         return NextResponse.json({ error: "Not authorized" }, { status: 403 });
       }
-    } catch {
+    } catch (err) {
+      logApiError({ route: ROUTE, step: "get-playlist", userId }, err);
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
     }
 
@@ -69,7 +73,8 @@ export async function POST(request: NextRequest) {
         );
       }
       connection = connections[0];
-    } catch {
+    } catch (err) {
+      logApiError({ route: ROUTE, step: "get-connection", userId }, err);
       return NextResponse.json(
         { error: "Failed to retrieve platform connection" },
         { status: 500 }
@@ -136,6 +141,7 @@ export async function POST(request: NextRequest) {
       });
     } catch (err) {
       // ── Mark sync job failed ──
+      logApiError({ route: ROUTE, step: "sync-execute", userId, requestBody: { playlistId, direction, platform } }, err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       await pb.collection("sync_jobs").update(syncJob.id, {
         status: "failed",
@@ -148,13 +154,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, jobId: syncJob.id });
   } catch (err) {
-    console.error("Sync error:", err);
-    return NextResponse.json(
-      {
-        error: err instanceof Error ? err.message : "Sync failed",
-      },
-      { status: 500 }
-    );
+    logApiError({ route: ROUTE, step: "main" }, err);
+    return apiError(err, "Sync failed");
   }
 }
 
@@ -179,9 +180,8 @@ async function importSpotifyPlaylist(
   const trackIds: string[] = [];
 
   for (const spotifyTrack of spotifyTracks) {
+    const trackData = spotifyTrackToTrack(spotifyTrack);
     try {
-      const trackData = spotifyTrackToTrack(spotifyTrack);
-
       // Check if track already exists (by platform + platform_id)
       const existing = await pb
         .collection("tracks")
@@ -203,8 +203,10 @@ async function importSpotifyPlaylist(
 
       trackIds.push(trackId);
     } catch (err) {
-      // Log individual track failure but continue
-      console.error(`Failed to import track "${spotifyTrack.name}":`, err);
+      logApiError(
+        { route: ROUTE, step: `track "${spotifyTrack.name}"`, requestBody: trackData },
+        err,
+      );
     }
   }
 

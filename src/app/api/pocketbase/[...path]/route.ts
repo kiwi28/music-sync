@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/pocketbase-server";
+import { logApiError, apiError } from "@/lib/api-errors";
+
+const ROUTE = "pocketbase/proxy";
 
 /**
  * Proxy route for PocketBase operations that require server-side validation.
@@ -173,10 +176,10 @@ async function handleProxy(
         return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
     }
   } catch (err) {
-    console.error("Proxy error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Proxy error" },
-      { status: 500 }
+    logApiError(
+      { route: ROUTE, step: `${method} ${path.join("/")}`, userId: "via-session" },
+      err,
     );
+    return apiError(err, "Proxy error");
   }
 }

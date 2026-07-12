@@ -3,6 +3,9 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { fetchSpotifyProfile } from "@/lib/spotify";
 import { getPublicOrigin } from "@/lib/url-utils";
+import { logApiError } from "@/lib/api-errors";
+
+const ROUTE = "spotify/callback";
 
 /**
  * GET /api/spotify/callback
@@ -150,7 +153,7 @@ export async function GET(request: Request) {
         });
       }
     } catch (err) {
-      console.error("[callback:step4] PocketBase connection upsert failed:", err instanceof Error ? err.message : err);
+      logApiError({ route: ROUTE, step: "step4:pb-upsert", userId }, err);
       return NextResponse.redirect(
         new URL("/settings?error=pb_write_failed", getPublicOrigin(request))
       );
@@ -161,7 +164,7 @@ export async function GET(request: Request) {
       new URL("/settings?success=spotify_connected", getPublicOrigin(request))
     );
   } catch (err) {
-    console.error("[callback:unhandled] Unexpected error:", err instanceof Error ? err.message : err);
+    logApiError({ route: ROUTE, step: "unhandled" }, err);
     return NextResponse.redirect(
       new URL(
         `/settings?error=${encodeURIComponent("internal_error")}`,
