@@ -155,7 +155,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, jobId: syncJob.id });
   } catch (err) {
     logApiError({ route: ROUTE, step: "main" }, err);
-    return apiError(err, "Sync failed");
+    const pbErr = err as { status?: number; message?: string; data?: unknown };
+    const status = pbErr.status || 500;
+    return NextResponse.json(
+      {
+        error: pbErr.message || "Sync failed",
+        details: pbErr.data || undefined,
+      },
+      { status },
+    );
   }
 }
 

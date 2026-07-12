@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/pocketbase-server";
-import { logApiError, apiError } from "@/lib/api-errors";
+import { logApiError } from "@/lib/api-errors";
 
 const ROUTE = "pocketbase/proxy";
 
@@ -105,22 +105,20 @@ async function handleProxy(
           filters.push(`user = "${userId}"`);
         }
 
-        let queryParams = searchParams.toString();
-        if (filters.length > 0) {
-          const existingFilter = searchParams.get("filter");
-          const combinedFilter = existingFilter
-            ? `(${existingFilter}) && ${filters.join(" && ")}`
-            : filters.join(" && ");
-          queryParams = queryParams
-            ? queryParams.replace(
-                `filter=${encodeURIComponent(existingFilter || "")}`,
-                `filter=${encodeURIComponent(combinedFilter)}`
-              )
-            : `filter=${encodeURIComponent(combinedFilter)}`;
+        const existingFilter = searchParams.get("filter");
+        const combinedFilter = existingFilter
+          ? `(${existingFilter}) && ${filters.join(" && ")}`
+          : filters.join(" && ");
+
+        // Rebuild query string with the combined filter
+        const newParams = new URLSearchParams(searchParams.toString());
+        if (combinedFilter) {
+          newParams.set("filter", combinedFilter);
         }
+        const queryString = newParams.toString();
 
         const result = await pb.send(
-          `${pb.baseUrl}/api/${url}${queryParams ? `?${queryParams}` : ""}`,
+          `${pb.baseUrl}/api/${url}${queryString ? `?${queryString}` : ""}`,
           { method: "GET" }
         );
         return NextResponse.json(result);
@@ -180,6 +178,17 @@ async function handleProxy(
       { route: ROUTE, step: `${method} ${path.join("/")}`, userId: "via-session" },
       err,
     );
-    return apiError(err, "Proxy error");
+    // Pass through PocketBase error details so the client sees the real error,
+    // not a generic "Proxy error" message.
+    const pbErr = err as { status?: number; message?: string; data?: unknown; url?: string };
+    const status = pbErr.status || 500;
+    return NextResponse.json(
+      {
+        error: pbErr.message || "Proxy error",
+        details: pbErr.data || undefined,
+        url: pbErr.url || undefined,
+      },
+      { status },
+    );
   }
 }

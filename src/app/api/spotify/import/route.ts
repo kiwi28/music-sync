@@ -87,7 +87,9 @@ export async function POST() {
         platform: "spotify",
         platform_id: sp.id,
         user: userId,
-        track_count: sp.tracks?.total ?? 0,
+        // Don't set track_count from Spotify metadata — tracks aren't imported
+        // until the user explicitly syncs. The sync route will update track_count
+        // when it actually imports tracks.
         is_public: sp.public,
       };
 
@@ -135,6 +137,14 @@ export async function POST() {
     });
   } catch (err) {
     logApiError({ route: ROUTE, userId: "unknown" }, err);
-    return apiError(err, "Import failed");
+    const pbErr = err as { status?: number; message?: string; data?: unknown };
+    const status = pbErr.status || 500;
+    return NextResponse.json(
+      {
+        error: pbErr.message || "Import failed",
+        details: pbErr.data || undefined,
+      },
+      { status },
+    );
   }
 }

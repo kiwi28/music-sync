@@ -55,6 +55,9 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
 
           {/* Meta */}
           <div className="flex flex-col items-end gap-1.5">
+            {!playlist.last_synced && (
+              <span className="text-[11px] text-amber-400/60">Needs sync</span>
+            )}
             {playlist.last_synced && (
               <Badge variant="success">
                 Synced {timeAgo(playlist.last_synced)}

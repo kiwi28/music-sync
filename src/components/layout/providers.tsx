@@ -46,8 +46,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       pb.collection("users")
         .authRefresh()
         .then(() => setLoading(false))
-        .catch(() => {
-          pb.authStore.clear();
+        .catch((err: unknown) => {
+          // Only clear auth on explicit 401/403 — NOT on network errors or 503s.
+          // Transient backend issues shouldn't log the user out.
+          const status = (err as { status?: number })?.status;
+          if (status === 401 || status === 403) {
+            console.warn("[auth] Token rejected by server — clearing session");
+            pb.authStore.clear();
+          } else {
+            console.warn("[auth] Could not refresh token (server may be unavailable):", (err as Error)?.message ?? err);
+            // Keep the existing token — it may still be valid when the server recovers
+          }
           setLoading(false);
         });
     } else {

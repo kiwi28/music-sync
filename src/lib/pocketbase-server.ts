@@ -67,8 +67,20 @@ export async function createServerClient(): Promise<PocketBase> {
             "PocketBase authRefresh",
           );
         } catch (err) {
-          logError({ source: SOURCE, fn: "createServerClient", step: "authRefresh" }, err);
-          pb.authStore.clear();
+          const status = (err as { status?: number })?.status;
+          // Only clear auth on explicit 401/403 — transient errors
+          // (network, 503, timeouts) should keep the session alive.
+          if (status === 401 || status === 403) {
+            logError({ source: SOURCE, fn: "createServerClient", step: "authRefresh" }, err);
+            pb.authStore.clear();
+          } else {
+            logError(
+              { source: SOURCE, fn: "createServerClient", step: "authRefresh-retained" },
+              err,
+            );
+            // Keep existing token — may still be valid when backend recovers.
+            // The stale token in authStore will be used for this request.
+          }
         }
       }
     } catch {

@@ -82,14 +82,18 @@ export function useSyncJobs(limit = 10) {
     }
     try {
       setLoading(true);
+      // NOTE: expand=playlist is omitted — PocketBase 0.28.x returns 400
+      // "Something went wrong" with expand on sync_jobs. The playlist name
+      // is displayed from the cached playlist list instead.
       const records = await pb.collection("sync_jobs").getList<SyncJob>(1, limit, {
         filter: `user = "${user.id}"`,
         sort: "-created",
-        expand: "playlist",
       });
       setJobs(records.items);
-    } catch {
-      // Collection might not be accessible yet
+    } catch (err) {
+      console.error("[useSyncJobs] Failed to fetch sync jobs:", err);
+      // Gracefully degrade — sync history is non-critical
+      setJobs([]);
     } finally {
       setLoading(false);
     }

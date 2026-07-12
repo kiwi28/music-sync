@@ -71,10 +71,22 @@ export default function PlaylistDetailPage({
   if (error || !playlist) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-lg font-medium text-white/40">Playlist not found</p>
-        <Link href="/playlists" className="mt-2 text-sm text-white/60 underline underline-offset-4 hover:text-white">
-          Back to playlists
-        </Link>
+        <p className="text-lg font-medium text-white/40">
+          {error ? "Failed to load playlist" : "Playlist not found"}
+        </p>
+        {error && (
+          <p className="mt-1 max-w-md text-center text-xs text-red-400/60">{error}</p>
+        )}
+        <div className="mt-4 flex gap-3">
+          {error && (
+            <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          )}
+          <Link href="/playlists" className="text-sm text-white/60 underline underline-offset-4 hover:text-white">
+            Back to playlists
+          </Link>
+        </div>
       </div>
     );
   }
