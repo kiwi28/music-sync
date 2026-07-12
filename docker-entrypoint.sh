@@ -1,11 +1,23 @@
 #!/bin/sh
 set -e
 
-# Copy migrations from image to volume (only new ones, don't overwrite)
+# Copy migrations from image to volume
+# Uses content comparison (not just filename) so fixed migrations in a new image
+# actually replace stale/broken copies left in the persistent volume.
 mkdir -p /pb_data/pb_migrations
 echo "=== Copying migrations ==="
 ls -la /pb_migrations_src/
-cp -rnv /pb_migrations_src/* /pb_data/pb_migrations/
+
+for src in /pb_migrations_src/*.js; do
+  [ -f "$src" ] || continue
+  dest="/pb_data/pb_migrations/${src##*/}"
+  if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+    echo "  unchanged: ${src##*/}"
+  else
+    cp -v "$src" "$dest"
+  fi
+done
+
 echo "=== Migrations in volume ==="
 ls -la /pb_data/pb_migrations/
 
