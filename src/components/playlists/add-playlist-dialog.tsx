@@ -44,12 +44,21 @@ export function AddPlaylistDialog({ open, onClose, onCreated }: AddPlaylistDialo
 
     setSubmitting(true);
     try {
+      // Read the user ID from the auth store directly — the React `user`
+      // state can be a stale/cookie-compacted record that is missing `id`.
+      const userId = pb.authStore.record?.id;
+      if (!userId) {
+        setError("Could not determine your user identity — please log in again.");
+        setSubmitting(false);
+        return;
+      }
+
       await pb.collection("playlists").create({
         name: playlistName,
         url,
         platform: detectedPlatform,
         platform_id: platformId,
-        user: user.id,
+        user: userId,
       });
 
       setUrl("");
