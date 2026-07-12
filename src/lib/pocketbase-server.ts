@@ -54,6 +54,14 @@ export async function createServerClient(): Promise<PocketBase> {
       const cookieData = JSON.parse(authCookie.value);
       const token = cookieData.token || null;
       const model = cookieData.record || cookieData.model || null;
+
+      if (!token || !model) {
+        console.warn(
+          "[pocketbase-server] pb_auth cookie parsed but missing fields:",
+          { hasToken: !!token, hasModel: !!model, keys: Object.keys(cookieData) },
+        );
+      }
+
       pb.authStore.save(token, model);
 
       // Always try to refresh (PocketBase handles expired tokens)
@@ -71,9 +79,21 @@ export async function createServerClient(): Promise<PocketBase> {
           // Only clear auth on explicit 401/403 — transient errors
           // (network, 503, timeouts) should keep the session alive.
           if (status === 401 || status === 403) {
+            console.error(
+              "[pocketbase-server] authRefresh rejected — clearing session. status:",
+              status,
+              "pb_url:",
+              PB_URL,
+              "message:",
+              (err as Error)?.message ?? err,
+            );
             logError({ source: SOURCE, fn: "createServerClient", step: "authRefresh" }, err);
             pb.authStore.clear();
           } else {
+            console.warn(
+              "[pocketbase-server] authRefresh network error — keeping session. message:",
+              (err as Error)?.message ?? err,
+            );
             logError(
               { source: SOURCE, fn: "createServerClient", step: "authRefresh-retained" },
               err,
@@ -83,9 +103,17 @@ export async function createServerClient(): Promise<PocketBase> {
           }
         }
       }
-    } catch {
+    } catch (parseErr) {
+      console.error(
+        "[pocketbase-server] Failed to parse pb_auth cookie:",
+        parseErr instanceof Error ? parseErr.message : parseErr,
+        "raw value:",
+        authCookie.value.substring(0, 200),
+      );
       pb.authStore.clear();
     }
+  } else {
+    console.warn("[pocketbase-server] No pb_auth cookie found in request");
   }
 
   return pb;

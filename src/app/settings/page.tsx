@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/layout/providers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PLATFORM_META } from "@/lib/utils";
+import { consumeFlash, type FlashMessage } from "@/lib/flash";
 import type { Platform } from "@/lib/types";
 
 const AVAILABLE_PLATFORMS: { id: Platform; label: string; description: string }[] = [
@@ -24,45 +25,16 @@ export default function SettingsPage() {
   const [statusMessage, setStatusMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  // Prevent re-processing the same params on re-renders
-  const processedKey = useRef<string | null>(null);
-
-  // Read error/success from URL, show it, and clean the URL
+  // Consume flash message from OAuth callbacks (or other server-side redirects).
+  // The flash cookie is set before the redirect and read once here — the URL
+  // stays clean throughout the flow.
   useEffect(() => {
-    const error = searchParams.get("error");
-    const success = searchParams.get("success");
-
-    // Nothing to do
-    if (!error && !success) return;
-
-    // Already processed this exact combination
-    const key = `${error ?? ""}|${success ?? ""}`;
-    if (processedKey.current === key) return;
-    processedKey.current = key;
-
-    if (error) {
-      const messages: Record<string, string> = {
-        spotify_auth_denied: "Spotify authorization was denied.",
-        missing_params: "Missing parameters in Spotify callback.",
-        csrf_mismatch: "Security check failed. Please try again.",
-        not_authenticated: "Your session expired. Please log in again.",
-        spotify_not_configured: "Spotify integration is not configured on the server.",
-        token_exchange_failed: "Failed to exchange Spotify authorization code.",
-        profile_fetch_failed: "Failed to fetch your Spotify profile.",
-        pb_unreachable: "The database is temporarily unavailable. Please try again in a moment.",
-        pb_write_failed: "Failed to save your Spotify connection. Please try again.",
-        internal_error: "An unexpected error occurred. Please try again.",
-      };
-      setStatusMessage({ type: "error", text: messages[error] ?? `Error: ${error}` });
-    } else if (success) {
-      setStatusMessage({ type: "success", text: "Spotify connected successfully!" });
+    const flash = consumeFlash();
+    if (flash) {
+      setStatusMessage({ type: flash.type, text: flash.message });
     }
-
-    // Clean the URL
-    router.replace("/settings");
-  }, [searchParams, router]);
+  }, []);
 
   async function handleImportSpotifyPlaylists() {
     setImportingPlaylists(true);

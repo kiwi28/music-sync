@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useAuth } from "@/components/layout/providers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { registerSchema, loginSchema } from "@/lib/validators";
+import { consumeFlash } from "@/lib/flash";
 import { ZodError } from "zod";
 
 export function LoginPage() {
@@ -17,6 +18,15 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  // Consume any flash message set by server-side redirects (e.g. expired
+  // session during Spotify OAuth callback).
+  useEffect(() => {
+    const flash = consumeFlash();
+    if (flash) {
+      setServerError(flash.message);
+    }
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
