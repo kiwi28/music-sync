@@ -77,8 +77,12 @@ export async function POST() {
         console.warn(`Spotify playlist "${sp.name}" (${sp.id}) has no tracks object — defaulting track_count to 0`);
       }
 
+      // PocketBase requires a non-empty name, but Spotify allows blank names
+      // (e.g. AI-generated playlists or system folders).
+      const name = sp.name?.trim() || "Untitled Playlist";
+
       const playlistData: Record<string, unknown> = {
-        name: sp.name,
+        name,
         description: sp.description || "",
         platform: "spotify",
         platform_id: sp.id,

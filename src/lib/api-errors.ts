@@ -1,17 +1,6 @@
 import { NextResponse } from "next/server";
 
-/**
- * Structured error logging for API routes.
- *
- * PocketBase's JS SDK throws ClientResponseError with:
- *   - message: generic ("Failed to create record.")
- *   - status:  HTTP status (400, 403, 404, etc.)
- *   - data:    field-level validation errors (the useful part)
- *   - url:     the PocketBase API URL that was called
- *
- * This utility extracts and logs all of that, then returns a
- * well-formed NextResponse so the client sees actionable errors.
- */
+// ── Types ────────────────────────────────────────────
 
 interface PocketBaseErrorLike {
   message?: string;
@@ -22,14 +11,19 @@ interface PocketBaseErrorLike {
   originalError?: unknown;
 }
 
-interface LogContext {
-  route: string;
-  step?: string;
+export interface LogContext {
+  source: string; // e.g. "spotify", "pocketbase", "api:sync"
+  fn: string; // function name, e.g. "fetchSpotifyPlaylists"
+  step?: string; // sub-step label
   userId?: string;
   requestBody?: unknown;
+  url?: string; // external URL that was called
+  status?: number; // HTTP status from the response
+  responseBody?: string; // raw response body on failure
 }
 
-/** Extract PocketBase error details from any caught error */
+// ── Internal helpers ─────────────────────────────────
+
 function extractPbError(err: unknown): PocketBaseErrorLike {
   if (err && typeof err === "object") {
     const e = err as Record<string, unknown>;
@@ -45,56 +39,85 @@ function extractPbError(err: unknown): PocketBaseErrorLike {
   return {};
 }
 
+// ── Library-level logger (no NextResponse coupling) ──
+
 /**
- * Log a caught error with full context (route, step, user, PB details).
- * Call this in every catch block across API routes.
+ * Log ANY external-call error with full context. Use this in library code
+ * (spotify.ts, pocketbase-server.ts) as well as API routes.
+ *
+ * Automatically detects PocketBase ClientResponseError and extracts its
+ * nested `data` payload. For plain Errors or fetch failures, logs the
+ * URL, status, and response body so you never have to guess what happened.
+ *
+ * Usage:
+ *   try { ... } catch (err) {
+ *     logError({ source: "spotify", fn: "fetchSpotifyPlaylists", url, status: res.status, responseBody: body }, err);
+ *     throw err;
+ *   }
  */
-export function logApiError(context: LogContext, err: unknown): void {
+export function logError(context: LogContext, err: unknown): void {
   const pb = extractPbError(err);
-  const parts: string[] = [`[${context.route}]`];
-  if (context.step) parts.push(`step=${context.step}`);
+  const label = `[${context.source}::${context.fn}]${context.step ? ` step=${context.step}` : ""}`;
 
-  const label = parts.join(" ");
+  // Primary message
+  const message =
+    pb.message ||
+    (err instanceof Error ? err.message : String(err));
+  console.error(`${label} — ${message}`);
 
-  console.error(`${label} — ${pb.message || (err instanceof Error ? err.message : String(err))}`);
-
+  // User context
   if (context.userId) {
     console.error(`${label}   user: ${context.userId}`);
   }
 
-  if (pb.status) {
-    console.error(`${label}   status: ${pb.status}  pb_url: ${pb.url || "n/a"}`);
+  // HTTP-level details (either from PocketBase or raw fetch)
+  const status = pb.status || context.status;
+  const url = pb.url || context.url;
+  if (status || url) {
+    console.error(`${label}   status: ${status ?? "n/a"}  url: ${url ?? "n/a"}`);
   }
 
+  // PocketBase field-level validation errors
   if (pb.data) {
-    console.error(`${label}   validation errors:`);
-    for (const [field, detail] of Object.entries(pb.data)) {
-      console.error(`${label}     ${field}: ${detail.message} (${detail.code})`);
+    const entries = Object.entries(pb.data);
+    if (entries.length > 0) {
+      console.error(`${label}   validation errors:`);
+      for (const [field, detail] of entries) {
+        console.error(`${label}     ${field}: ${detail.message} (${detail.code})`);
+      }
     }
   }
 
+  // Raw response body from external APIs
+  if (context.responseBody) {
+    console.error(`${label}   response body:`, context.responseBody);
+  }
+
+  // Request body that triggered the error
   if (context.requestBody) {
     console.error(`${label}   request body:`, JSON.stringify(context.requestBody, null, 2));
   }
 
-  // Log full raw error for unexpected errors
-  if (!pb.status && !pb.data) {
+  // Raw error dump for unexpected errors (no status = not an HTTP error)
+  if (!status && !pb.data) {
     console.error(`${label}   raw error:`, err);
   }
 }
 
+// ── API-route response builder ────────────────────────
+
 /**
  * Build a NextResponse from a caught error.
- * Returns 400-level statuses from PocketBase as-is (they're client errors).
- * Returns 500 for truly unexpected errors.
+ * Passes through PocketBase 4xx validation errors to the client.
+ * Returns 500 for unexpected errors (without leaking internals).
  *
  * Usage:
  *   try { ... } catch (err) {
- *     logApiError({ route: "spotify/import" }, err);
- *     return apiError(err, "Failed to import playlists");
+ *     logError({ source: "api:sync", fn: "POST" }, err);
+ *     return apiErrorResponse(err, "Sync failed");
  *   }
  */
-export function apiError(err: unknown, fallbackMessage: string): NextResponse {
+export function apiErrorResponse(err: unknown, fallbackMessage: string): NextResponse {
   const pb = extractPbError(err);
 
   // PocketBase validation errors (4xx) — pass through to client
@@ -111,4 +134,16 @@ export function apiError(err: unknown, fallbackMessage: string): NextResponse {
   // Unexpected / network / 5xx errors — don't leak internals
   const message = err instanceof Error ? err.message : fallbackMessage;
   return NextResponse.json({ error: message }, { status: 500 });
+}
+
+// ── Deprecated aliases (backward compat) ──────────────
+
+/** @deprecated Use `logError` instead */
+export function logApiError(context: { route: string; step?: string; userId?: string; requestBody?: unknown }, err: unknown): void {
+  logError({ source: `api:${context.route}`, fn: context.step || "handler", userId: context.userId, requestBody: context.requestBody }, err);
+}
+
+/** @deprecated Use `apiErrorResponse` instead */
+export function apiError(err: unknown, fallbackMessage: string): NextResponse {
+  return apiErrorResponse(err, fallbackMessage);
 }
