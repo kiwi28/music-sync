@@ -1,0 +1,154 @@
+// Background worker — polls PocketBase for pending sync_jobs and dispatches
+// downloads to spotdl (Spotify) or yt-dlp (YouTube Music).
+//
+// Architecture:
+//   poll loop → processJob → dispatch by platform → download → dedup → create PB records
+//
+// The worker runs as the PocketBase superuser so it can operate across all
+// user accounts.
+
+import { getAdminClient } from "./pb-client.js";
+import { processSpotifyJob } from "./downloads/spotdl.js";
+import { processYoutubeMusicJob } from "./downloads/ytdlp.js";
+import { sleep, extractErrorMessage } from "./utils.js";
+
+const POLL_INTERVAL_MS = parseInt(
+  process.env.POLL_INTERVAL || "15000",
+  10,
+);
+
+/**
+ * Map of platform → handler function.
+ * Add new platforms here as downloaders are implemented.
+ */
+const HANDLERS = {
+  spotify: processSpotifyJob,
+  youtube_music: processYoutubeMusicJob,
+};
+
+// ── Startup: reset stale "running" jobs ──
+async function resetStaleJobs(pb) {
+  const tenMinutesAgo = new Date(
+    Date.now() - 10 * 60 * 1000,
+  ).toISOString();
+
+  const staleJobs = await pb.collection("sync_jobs").getFullList({
+    filter: `status = "running" && created < "${tenMinutesAgo}"`,
+  });
+
+  for (const job of staleJobs) {
+    console.log(`[worker] Resetting stale job ${job.id} → pending`);
+    await pb.collection("sync_jobs").update(job.id, {
+      status: "pending",
+      log: `${job.log || ""}\nReset from "running" after worker restart`,
+    });
+  }
+
+  if (staleJobs.length) {
+    console.log(`[worker] Reset ${staleJobs.length} stale jobs`);
+  }
+}
+
+// ── Main job processing ──
+async function processJob(pb, job) {
+  const playlist = job.expand?.playlist;
+  if (!playlist) {
+    await pb.collection("sync_jobs").update(job.id, {
+      status: "failed",
+      error: "Associated playlist not found (orphaned job)",
+      completed_at: new Date().toISOString(),
+    });
+    return;
+  }
+
+  console.log(`[worker] Processing job ${job.id}: "${playlist.name}" (${playlist.platform})`);
+
+  // Mark as running
+  await pb.collection("sync_jobs").update(job.id, {
+    status: "running",
+    started_at: new Date().toISOString(),
+    log: `Downloading "${playlist.name}" via ${playlist.platform}…`,
+  });
+
+  const handler = HANDLERS[playlist.platform];
+  if (!handler) {
+    await pb.collection("sync_jobs").update(job.id, {
+      status: "failed",
+      error: `Unsupported platform: ${playlist.platform}`,
+      completed_at: new Date().toISOString(),
+      log: `Platform "${playlist.platform}" is not supported for automated sync. Currently supported: ${Object.keys(HANDLERS).join(", ")}.`,
+    });
+    return;
+  }
+
+  try {
+    const result = await handler(playlist);
+
+    // Job completed successfully
+    await pb.collection("sync_jobs").update(job.id, {
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      tracks_added: result.tracksAdded,
+      log: `Sync complete. ${result.tracksAdded} new, ${result.totalTracks} total.`,
+    });
+
+    // Update playlist stats
+    await pb.collection("playlists").update(playlist.id, {
+      track_count: result.totalTracks,
+      last_synced: new Date().toISOString(),
+    });
+
+    console.log(
+      `[worker] Job ${job.id} completed: +${result.tracksAdded} tracks`,
+    );
+  } catch (err) {
+    console.error(`[worker] Job ${job.id} failed:`, err);
+
+    await pb.collection("sync_jobs").update(job.id, {
+      status: "failed",
+      error: extractErrorMessage(err),
+      completed_at: new Date().toISOString(),
+      log: `Sync failed: ${extractErrorMessage(err)}`,
+    });
+  }
+}
+
+// ── Main loop ──
+async function main() {
+  console.log("[worker] Starting music-sync background worker…");
+
+  let pb;
+  try {
+    pb = await getAdminClient();
+  } catch (err) {
+    console.error("[worker] Failed to authenticate as admin:", err.message);
+    console.error("[worker] Ensure PocketBase is reachable and superuser credentials are correct.");
+    process.exit(1);
+  }
+
+  // Reset any jobs left in "running" state from a previous crash
+  await resetStaleJobs(pb);
+
+  console.log(`[worker] Polling every ${POLL_INTERVAL_MS / 1000}s for pending jobs…`);
+
+  while (true) {
+    try {
+      const jobs = await pb.collection("sync_jobs").getList(1, 5, {
+        filter: 'status = "pending"',
+        sort: "created",
+        expand: "playlist",
+      });
+
+      for (const job of jobs.items) {
+        await processJob(pb, job);
+      }
+    } catch (err) {
+      // Don't crash on transient poll errors — log and retry
+      console.error("[worker] Poll error:", err.message);
+    }
+
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
+main();

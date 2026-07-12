@@ -7,12 +7,10 @@ const ROUTE = "sync";
 
 /**
  * POST /api/sync
- * Marks a playlist as synced by updating last_synced and creating a sync_job record.
  *
- * No external API calls are made — this is a manual tracking operation.
- * The user verifies the playlist is up-to-date and clicks "Sync Now" to record
- * the timestamp. Future versions can add automatic metadata extraction or
- * public-page scraping here.
+ * Creates a pending sync_job that the background worker picks up.
+ * The worker handles the actual download via spotdl / yt-dlp and
+ * updates the job status to "running" → "completed" (or "failed").
  */
 export async function POST(request: NextRequest) {
   try {
@@ -48,23 +46,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
     }
 
-    const now = new Date().toISOString();
-
-    // ── Create completed sync job ──
+    // ── Create pending sync job ──
+    // The background worker picks this up and does the actual download.
     const syncJob = await pb.collection("sync_jobs").create({
       playlist: playlistId,
       user: userId,
-      status: "completed",
-      started_at: now,
-      completed_at: now,
-      tracks_added: 0,
-      log: `Manual sync of "${playlist.name}"`,
+      status: "pending",
+      log: `Queued sync of "${playlist.name}"`,
     });
-
-    // ── Update playlist last_synced ──
-    await pb.collection("playlists").update(playlistId, {
-      last_synced: now,
-    });
+    // playlist.last_synced and track_count are updated by the worker on completion.
 
     return NextResponse.json({ success: true, jobId: syncJob.id });
   } catch (err) {
