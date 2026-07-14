@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./providers";
-import { House, Music, Settings } from "lucide-react";
+import { Headphones, House, Music, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", Icon: House },
@@ -56,6 +56,34 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        {/* External links */}
+        <div className="border-t border-white/5 px-3 py-4">
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-white/25">
+            Streaming
+          </p>
+          <a
+            href="https://spoty.kiw.ro"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            <Headphones className="h-4 w-4" />
+            Navidrome
+            {/* External link indicator */}
+            <svg
+              className="ml-auto h-3 w-3 opacity-40"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <path d="M15 3h6v6" />
+              <path d="M10 14 21 3" />
+            </svg>
+          </a>
+        </div>
 
         {/* User section */}
         <div className="border-t border-white/5 p-4">

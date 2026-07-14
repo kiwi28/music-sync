@@ -117,3 +117,34 @@ ports:
 ```
 
 This means only nginx (on the host) can reach them. Do NOT expose these on `0.0.0.0` — it would bypass SSL and the security headers.
+
+## Rule D13: No `:latest` Tags — Pin Exact Versions
+
+**Never use `:latest` (or any floating tag) in `docker-compose.yml` or any Dockerfile `FROM` line.** Always pin to an exact version number (e.g., `deluan/navidrome:0.63.2`, NOT `deluan/navidrome:latest`).
+
+### Why
+
+- **Reproducibility** — `:latest` means "whatever was most recently pushed." A `docker pull` today and a `docker pull` next week can produce different images, making bugs unreproducible and deployments non-deterministic.
+- **Silent breakage** — a new `latest` can introduce breaking changes, CVEs, or config incompatibilities without any code change on your side.
+- **Rollback safety** — if you need to roll back, you know exactly which version was running.
+
+### Acceptable patterns
+
+```yaml
+# ✅ Correct — pinned to an exact version
+image: deluan/navidrome:0.63.2
+image: node:22.14.0-alpine
+```
+
+```yaml
+# ❌ Wrong — floating tags
+image: deluan/navidrome:latest
+image: node:22-alpine        # minor/patch can still drift
+image: postgres:16           # patch version can drift
+```
+
+### When upgrading
+
+1. Look up the actual latest version tag on Docker Hub or the project's releases page
+2. Update the pinned version in `docker-compose.yml`
+3. Test with `docker compose up -d` before committing

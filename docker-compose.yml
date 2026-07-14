@@ -52,7 +52,7 @@ services:
 
   # ── Navidrome music streamer ──
   navidrome:
-    image: deluan/navidrome:latest
+    image: deluan/navidrome:0.63.2
     container_name: musicsync-navidrome
     volumes:
       - music:/music:ro
