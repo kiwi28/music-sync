@@ -58,11 +58,9 @@ export async function ensureSpotifyToken(pb) {
     });
   }
 
-  // Write spotdl-compatible cache file (spotipy CacheFileHandler format)
-  // The filename pattern is .spotipy-cache-{username}; spotdl resolves it
-  // via the SPOTIPY_CLIENT_USERNAME env var or defaults.
+  // Write the token to a file that spotdl reads via --auth-token flag.
   await mkdir(CACHE_DIR, { recursive: true });
-  const cacheFile = join(CACHE_DIR, ".spotipy-cache-spotify");
+  const cacheFile = join(CACHE_DIR, "token.json");
   await writeFile(
     cacheFile,
     JSON.stringify({
@@ -75,8 +73,9 @@ export async function ensureSpotifyToken(pb) {
     }),
     { mode: 0o600 }
   );
+  console.log(`[spotify-token] Token written to ${cacheFile}`);
 
-  return access_token;
+  return cacheFile;
 }
 
 /**

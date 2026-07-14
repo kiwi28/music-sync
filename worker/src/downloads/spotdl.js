@@ -27,10 +27,10 @@ export async function processSpotifyJob(playlist, onProgress) {
   const playlistId = playlist.id;
   const url = playlist.url;
 
-  // Ensure valid Spotify tokens are in spotdl's cache.
-  // This bridges the web UI OAuth flow → spotdl automatically.
+  // Ensure valid Spotify tokens from PocketBase → pass to spotdl via --auth-token
+  let tokenFile;
   try {
-    await ensureSpotifyToken(pb);
+    tokenFile = await ensureSpotifyToken(pb);
   } catch (err) {
     throw new Error(`Spotify auth: ${err.message}`);
   }
@@ -53,10 +53,12 @@ export async function processSpotifyJob(playlist, onProgress) {
       "save", url,
       "--save-file", metadataFile,
       "--user-auth",
+      "--auth-token", tokenFile,
     ], { timeout: 120_000 });
     saveStderr = result.stderr || "";
   } catch (err) {
     saveStderr = err.stderr || err.message || "";
+    console.error(`[spotdl] save stderr:`, saveStderr);
     // Detect auth failures and give clear guidance
     if (
       saveStderr.includes("auth") ||
@@ -68,9 +70,7 @@ export async function processSpotifyJob(playlist, onProgress) {
       saveStderr.includes("401")
     ) {
       throw new Error(
-        "Spotify authentication required. SSH into your server and run:\n" +
-        `  docker compose exec worker spotdl save "${url}" --user-auth --headless\n` +
-        "Then open the printed URL in your browser, log in to Spotify, and paste the redirect URL back into the terminal."
+        "Spotify authentication failed. Go to Settings → Connect Spotify to re-authorize, then try again."
       );
     }
     console.warn(`[spotdl] save exited non-zero, checking for partial output:`, err.message);
@@ -143,6 +143,7 @@ export async function processSpotifyJob(playlist, onProgress) {
         "--format", "mp3",
         "--bitrate", "320k",
         "--user-auth",
+        "--auth-token", tokenFile,
       ], { timeout: 1_800_000 });
     } catch (err) {
       const stderr = err.stderr || err.message || "";
