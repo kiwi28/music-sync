@@ -28,5 +28,7 @@ COPY worker/src/ ./src/
 # Verify tools are available
 RUN spotdl --version && yt-dlp --version && ffmpeg -version
 
-USER node
+# Create music dirs ahead of volume mount (ownership set at runtime)
+RUN mkdir -p /music/spotify /music/youtube_music
+
 CMD ["node", "src/worker.js"]
