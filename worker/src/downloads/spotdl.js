@@ -14,6 +14,7 @@ import { getAdminClient, withReauth } from "../pb-client.js";
 import { findExistingTrack } from "../dedup.js";
 import { parseFileMetadata } from "../metadata.js";
 import { ensureDir, sanitizeFolderName } from "../utils.js";
+import { ensureSpotifyToken } from "../spotify-token.js";
 
 const execFileAsync = promisify(execFile);
 const MUSIC_DIR = process.env.MUSIC_DIR || "/music";
@@ -25,6 +26,14 @@ export async function processSpotifyJob(playlist, onProgress) {
   const pb = await getAdminClient();
   const playlistId = playlist.id;
   const url = playlist.url;
+
+  // Ensure valid Spotify tokens are in spotdl's cache.
+  // This bridges the web UI OAuth flow → spotdl automatically.
+  try {
+    await ensureSpotifyToken(pb);
+  } catch (err) {
+    throw new Error(`Spotify auth: ${err.message}`);
+  }
 
   const outputDir = join(
     MUSIC_DIR,
@@ -38,12 +47,32 @@ export async function processSpotifyJob(playlist, onProgress) {
   onProgress?.(`Fetching track list from Spotify…`);
   console.log(`[spotdl] Fetching metadata for "${playlist.name}"...`);
 
+  let saveStderr = "";
   try {
-    await execFileAsync("spotdl", [
+    const result = await execFileAsync("spotdl", [
       "save", url,
       "--save-file", metadataFile,
+      "--user-auth",
     ], { timeout: 120_000 });
+    saveStderr = result.stderr || "";
   } catch (err) {
+    saveStderr = err.stderr || err.message || "";
+    // Detect auth failures and give clear guidance
+    if (
+      saveStderr.includes("auth") ||
+      saveStderr.includes("token") ||
+      saveStderr.includes("login") ||
+      saveStderr.includes("premium") ||
+      saveStderr.includes("permission") ||
+      saveStderr.includes("403") ||
+      saveStderr.includes("401")
+    ) {
+      throw new Error(
+        "Spotify authentication required. SSH into your server and run:\n" +
+        `  docker compose exec worker spotdl save "${url}" --user-auth --headless\n` +
+        "Then open the printed URL in your browser, log in to Spotify, and paste the redirect URL back into the terminal."
+      );
+    }
     console.warn(`[spotdl] save exited non-zero, checking for partial output:`, err.message);
   }
 
@@ -113,8 +142,25 @@ export async function processSpotifyJob(playlist, onProgress) {
         "--output", join(outputDir, "{artist} - {title}.{output-ext}"),
         "--format", "mp3",
         "--bitrate", "320k",
+        "--user-auth",
       ], { timeout: 1_800_000 });
     } catch (err) {
+      const stderr = err.stderr || err.message || "";
+      if (
+        stderr.includes("auth") ||
+        stderr.includes("token") ||
+        stderr.includes("login") ||
+        stderr.includes("premium") ||
+        stderr.includes("permission") ||
+        stderr.includes("403") ||
+        stderr.includes("401")
+      ) {
+        throw new Error(
+          "Spotify authentication expired. SSH into your server and run:\n" +
+          `  docker compose exec worker spotdl save "${url}" --user-auth --headless\n` +
+          "Then open the printed URL in your browser, log in to Spotify, and paste the redirect URL back."
+        );
+      }
       throw new Error(`spotdl download failed: ${err.message}`);
     }
   }

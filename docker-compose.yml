@@ -22,6 +22,7 @@ services:
     container_name: musicsync-worker
     volumes:
       - music:/music
+      - spotdl_config:/home/node/.spotdl
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
       - PB_SUPERUSER_EMAIL=${PB_SUPERUSER_EMAIL:-admin@musicsync.local}
@@ -29,6 +30,9 @@ services:
       - MUSIC_DIR=/music
       - POLL_INTERVAL=15000
       - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES:-10080}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+      - SPOTIFY_REDIRECT_URI=${SPOTIFY_REDIRECT_URI:-}
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -46,6 +50,9 @@ services:
       - POCKETBASE_URL=http://pocketbase:8090
       - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+      - SPOTIFY_REDIRECT_URI=${SPOTIFY_REDIRECT_URI:-}
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -74,3 +81,4 @@ volumes:
   pb_data:
   music:
   navidrome_data:
+  spotdl_config:

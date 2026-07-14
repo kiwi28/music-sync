@@ -24,11 +24,16 @@ RUN npm install --omit=dev
 
 # Copy worker source
 COPY worker/src/ ./src/
+COPY worker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Verify tools are available
 RUN spotdl --version && yt-dlp --version && ffmpeg -version
 
+# spotdl config/cache dir — persists OAuth tokens across restarts
+RUN mkdir -p /home/node/.spotdl && chown -R node:node /home/node
+
 # Create music dirs ahead of volume mount (ownership set at runtime)
 RUN mkdir -p /music/spotify /music/youtube_music
 
-CMD ["node", "src/worker.js"]
+ENTRYPOINT ["/entrypoint.sh"]

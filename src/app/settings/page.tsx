@@ -5,6 +5,7 @@ import { useAuth } from "@/components/layout/providers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { consumeFlash } from "@/lib/flash";
+import { SpotifyConnection } from "@/components/settings/spotify-connection";
 
 export default function SettingsPage() {
   const { user, logout, pb } = useAuth();
@@ -58,6 +59,19 @@ export default function SettingsPage() {
               Sign out
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Spotify connection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Spotify</CardTitle>
+          <CardDescription>
+            Connect your Spotify account to sync playlists and liked songs
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SpotifyConnection />
         </CardContent>
       </Card>
 
