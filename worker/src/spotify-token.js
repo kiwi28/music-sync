@@ -73,9 +73,9 @@ export async function ensureSpotifyToken(pb) {
     }),
     { mode: 0o600 }
   );
-  console.log(`[spotify-token] Token written to ${cacheFile}`);
+  console.log(`[spotify-token] Token cached, expires ${token_expires_at}`);
 
-  return cacheFile;
+  return access_token;
 }
 
 /**
