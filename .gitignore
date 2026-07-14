@@ -40,4 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# pocketbase data (contains user data, credentials, and SQLite DB)
+/pb_data/
+pocketbase.exe
+
 .claude

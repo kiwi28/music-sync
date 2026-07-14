@@ -9,10 +9,15 @@ export function sleep(ms) {
 
 /**
  * Escape a string for safe use inside a PocketBase filter literal.
- * Backslash-escapes backslashes and double quotes.
+ * Backslash-escapes backslashes, double quotes, and single quotes.
+ * Caps the value at 500 characters to prevent query bloat.
  */
 export function escapeFilter(value) {
-  return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const capped = String(value).slice(0, 500);
+  return capped
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/'/g, "\\'");
 }
 
 /**

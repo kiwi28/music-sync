@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { PLATFORM_META } from "@/lib/utils";
 
 export default function PlaylistsPage() {
-  const { playlists, loading, error } = usePlaylists();
+  const { playlists, loading, error, refetch } = usePlaylists();
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -104,7 +104,7 @@ export default function PlaylistsPage() {
       <AddPlaylistDialog
         open={showAddDialog}
         onClose={() => setShowAddDialog(false)}
-        onCreated={() => window.location.reload()}
+        onCreated={() => refetch()}
       />
     </div>
   );

@@ -11,6 +11,7 @@ import { getAdminClient } from "./pb-client.js";
 import { processSpotifyJob } from "./downloads/spotdl.js";
 import { processYoutubeMusicJob } from "./downloads/ytdlp.js";
 import { sleep, extractErrorMessage } from "./utils.js";
+import { startScheduler } from "./scheduler.js";
 
 const POLL_INTERVAL_MS = parseInt(
   process.env.POLL_INTERVAL || "15000",
@@ -128,6 +129,9 @@ async function main() {
 
   // Reset any jobs left in "running" state from a previous crash
   await resetStaleJobs(pb);
+
+  // Start the periodic scheduler for re-syncing stale playlists
+  startScheduler();
 
   console.log(`[worker] Polling every ${POLL_INTERVAL_MS / 1000}s for pending jobs…`);
 

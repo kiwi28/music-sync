@@ -12,7 +12,7 @@ import Link from "next/link";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { playlists, loading: playlistsLoading } = usePlaylists();
+  const { playlists, loading: playlistsLoading, refetch } = usePlaylists();
   const { jobs, loading: jobsLoading } = useSyncJobs(5);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
@@ -42,7 +42,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Playlists" value={stats.totalPlaylists} loading={playlistsLoading} />
         <StatCard label="Total Tracks" value={stats.totalTracks} loading={playlistsLoading} />
         <StatCard label="Synced" value={stats.syncedPlaylists} loading={playlistsLoading} />
@@ -110,9 +110,7 @@ export default function DashboardPage() {
         open={showAddDialog}
         onClose={() => setShowAddDialog(false)}
         onCreated={() => {
-          // Trigger a refetch — the usePlaylists hook will pick up changes
-          // on next render, but we reload for simplicity
-          window.location.reload();
+          refetch();
         }}
       />
     </div>

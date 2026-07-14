@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# source + build
+# source + build (output: "standalone" produces .next/standalone/)
 COPY . .
 RUN npm run build
 
@@ -18,14 +18,15 @@ RUN addgroup -g 1001 -S nodejs \
  && adduser -S nextjs -u 1001 \
  && chown -R nextjs:nodejs /app
 
-# production deps only (fresh install, not copied from builder)
-COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/package-lock.json ./
-RUN npm ci --omit=dev
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+# Standalone output: the server is self-contained with only production deps.
+# No npm ci needed — the standalone build already includes node_modules.
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Static files live outside the standalone dir — copy them into place.
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
 ENV NODE_ENV=production
 EXPOSE 3100
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

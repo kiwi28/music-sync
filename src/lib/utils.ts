@@ -47,7 +47,6 @@ export function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength - 1) + "…";
 }
 
-/** CSP-compliant nonce generator (server-only) */
-export function generateNonce(): string {
-  return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
-}
+// NOTE: `generateNonce` has been moved to `@/lib/nonce` (server-only).
+// It was previously defined here using Node.js Buffer, which would crash
+// client-side builds. Import from "@/lib/nonce" for server-side usage.

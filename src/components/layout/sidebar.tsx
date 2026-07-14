@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./providers";
+import { House, Music, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: HomeIcon },
-  { href: "/playlists", label: "Playlists", icon: ListMusicIcon },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+  { href: "/", label: "Dashboard", Icon: House },
+  { href: "/playlists", label: "Playlists", Icon: Music },
+  { href: "/settings", label: "Settings", Icon: Settings },
 ] as const;
 
 export function Sidebar() {
@@ -49,7 +50,7 @@ export function Sidebar() {
                     : "text-white/50 hover:bg-white/5 hover:text-white"
                 )}
               >
-                <item.icon className="h-4 w-4" />
+                <item.Icon className="h-4 w-4" />
                 {item.label}
               </Link>
             );
@@ -69,31 +70,5 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
-  );
-}
-
-// Mini inline SVG icons to avoid extra dependency
-function HomeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M2 6l6-4 6 4v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6z" />
-    </svg>
-  );
-}
-function ListMusicIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M6 11V4l7-1v8" />
-      <circle cx="4.5" cy="12.5" r="1.5" />
-      <circle cx="11.5" cy="10.5" r="1.5" />
-    </svg>
-  );
-}
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="8" cy="8" r="2.5" />
-      <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" />
-    </svg>
   );
 }

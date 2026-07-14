@@ -14,6 +14,16 @@ const ROUTE = "sync";
  */
 export async function POST(request: NextRequest) {
   try {
+    // ── CSRF defense: verify Origin header ──
+    const origin = request.headers.get("origin");
+    const expectedOrigin = process.env.NEXT_PUBLIC_SITE_URL || "";
+    if (origin && expectedOrigin && origin !== expectedOrigin) {
+      return NextResponse.json(
+        { error: "Invalid origin" },
+        { status: 403 },
+      );
+    }
+
     // ── Auth check ──
     const pb = await createServerClient();
     if (!pb.authStore.isValid || !pb.authStore.record) {
@@ -44,6 +54,17 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       logApiError({ route: ROUTE, step: "get-playlist", userId }, err);
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 });
+    }
+
+    // ── Rate limiting: prevent duplicate pending/running jobs ──
+    const existingJobs = await pb.collection("sync_jobs").getList(1, 1, {
+      filter: `playlist = "${playlistId}" && (status = "pending" || status = "running")`,
+    });
+    if (existingJobs.totalItems > 0) {
+      return NextResponse.json(
+        { error: "A sync is already in progress or queued for this playlist" },
+        { status: 409 },
+      );
     }
 
     // ── Create pending sync job ──

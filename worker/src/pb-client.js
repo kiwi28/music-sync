@@ -30,3 +30,31 @@ export async function getAdminClient() {
 
   return pb;
 }
+
+/**
+ * Wrap a PocketBase API call with automatic re-authentication on 401.
+ * Long-running downloads (30+ min) may cause the admin token to expire
+ * before track records are created. This wrapper catches 401 errors,
+ * re-authenticates, and retries the operation once.
+ *
+ * @template T
+ * @param {() => Promise<T>} fn - A function that calls PocketBase APIs
+ * @returns {Promise<T>}
+ */
+export async function withReauth(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    // PocketBase ClientResponseError has status and response on the error object
+    if (err && typeof err === "object" && /** @type {any} */ (err).status === 401) {
+      console.log("[pb-client] Token expired mid-operation — re-authenticating...");
+      // Force re-auth on next getAdminClient call
+      if (pb) pb.authStore.clear();
+      pb = null;
+      await getAdminClient();
+      // Retry once with fresh token
+      return await fn();
+    }
+    throw err;
+  }
+}

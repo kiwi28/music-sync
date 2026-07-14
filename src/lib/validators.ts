@@ -1,16 +1,11 @@
 import { z } from "zod";
 import type { Platform } from "./types";
+import { PLATFORM_DOMAINS } from "./url-utils";
 
 export const PLATFORMS: Platform[] = ["spotify", "apple_music", "youtube_music", "tidal", "deezer"];
 
-/** Recognized music platform hostnames for URL validation */
-const PLATFORM_HOSTS = [
-  "open.spotify.com", "spotify.com",
-  "music.apple.com", "apple.co",
-  "music.youtube.com", "youtube.com",
-  "tidal.com", "listen.tidal.com",
-  "deezer.com", "www.deezer.com",
-] as const;
+/** Recognized music platform hostnames for URL validation — derived from canonical source */
+const PLATFORM_HOSTS = Object.keys(PLATFORM_DOMAINS) as readonly string[];
 
 /** User registration schema */
 export const registerSchema = z.object({

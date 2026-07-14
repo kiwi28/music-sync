@@ -13,7 +13,8 @@ export function getPublicOrigin(request: Request): string {
   const host =
     request.headers.get("x-forwarded-host") ||
     request.headers.get("host") ||
-    "musicsync.kiw.ro";
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "") ||
+    "localhost:3100";
 
   const proto =
     request.headers.get("x-forwarded-proto") ||
@@ -25,7 +26,7 @@ export function getPublicOrigin(request: Request): string {
 // ── Playlist URL parsing ────────────────────────────────
 
 /** Recognized music platform domains mapped to Platform values */
-const PLATFORM_DOMAINS: Record<string, Platform> = {
+export const PLATFORM_DOMAINS: Record<string, Platform> = {
   "open.spotify.com": "spotify",
   "spotify.com": "spotify",
   "music.apple.com": "apple_music",

@@ -11,7 +11,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { getAdminClient } from "../pb-client.js";
+import { getAdminClient, withReauth } from "../pb-client.js";
 import { findExistingTrack } from "../dedup.js";
 import { parseFileMetadata } from "../metadata.js";
 import { ensureDir, sanitizeFolderName } from "../utils.js";
@@ -120,19 +120,21 @@ export async function processYoutubeMusicJob(playlist) {
   // Phase 4: Create Track + PlaylistTrack records
   let tracksAdded = 0;
 
-  // Link existing tracks
+  // Link existing tracks — wrapped in withReauth for token expiry during long downloads
   for (const { trackId, position } of existingTrackIds) {
-    const existingLink = await pb.collection("playlist_tracks").getList(1, 1, {
-      filter: `playlist = "${playlistId}" && track = "${trackId}"`,
-    });
-    if (existingLink.totalItems === 0) {
-      await pb.collection("playlist_tracks").create({
-        playlist: playlistId,
-        track: trackId,
-        position,
-        added_at: new Date().toISOString(),
+    await withReauth(async () => {
+      const existingLink = await pb.collection("playlist_tracks").getList(1, 1, {
+        filter: `playlist = "${playlistId}" && track = "${trackId}"`,
       });
-    }
+      if (existingLink.totalItems === 0) {
+        await pb.collection("playlist_tracks").create({
+          playlist: playlistId,
+          track: trackId,
+          position,
+          added_at: new Date().toISOString(),
+        });
+      }
+    });
   }
 
   // Create records for new tracks — read metadata from downloaded files
@@ -161,26 +163,34 @@ export async function processYoutubeMusicJob(playlist) {
       isrc: null,
     };
     if (fileMatch) {
-      fileMeta = await parseFileMetadata(join(outputDir, fileMatch));
+      fileMeta = await parseFileMetadata(join(outputDir, fileMatch), {
+        title: meta._title,
+        artist: meta._artist,
+        album: meta._album,
+        durationMs: meta._durationMs,
+        isrc: null,
+      });
     }
 
-    // Create track record
-    const track = await pb.collection("tracks").create({
-      title: fileMeta.title,
-      artist: fileMeta.artist,
-      album: fileMeta.album || null,
-      platform: "youtube_music",
-      platform_id: meta._videoId,
-      duration_ms: fileMeta.durationMs || meta._durationMs,
-      isrc: fileMeta.isrc || null,
-    });
+    // Create track + playlist_track records wrapped in withReauth
+    // to handle token expiry during long downloads (30+ min).
+    await withReauth(async () => {
+      const track = await pb.collection("tracks").create({
+        title: fileMeta.title,
+        artist: fileMeta.artist,
+        album: fileMeta.album || null,
+        platform: "youtube_music",
+        platform_id: meta._videoId,
+        duration_ms: fileMeta.durationMs || meta._durationMs,
+        isrc: fileMeta.isrc || null,
+      });
 
-    // Create playlist_track relation
-    await pb.collection("playlist_tracks").create({
-      playlist: playlistId,
-      track: track.id,
-      position: meta._index,
-      added_at: new Date().toISOString(),
+      await pb.collection("playlist_tracks").create({
+        playlist: playlistId,
+        track: track.id,
+        position: meta._index,
+        added_at: new Date().toISOString(),
+      });
     });
 
     tracksAdded++;

@@ -10,7 +10,7 @@ import { readFile, unlink, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { getAdminClient } from "../pb-client.js";
+import { getAdminClient, withReauth } from "../pb-client.js";
 import { findExistingTrack } from "../dedup.js";
 import { parseFileMetadata } from "../metadata.js";
 import { ensureDir, sanitizeFolderName } from "../utils.js";
@@ -101,7 +101,7 @@ export async function processSpotifyJob(playlist) {
 
   console.log(`[spotdl] ${existingTrackIds.length} existing, ${newTracks.length} new (of ${trackList.length})`);
 
-  // Phase 3: Download new tracks
+  // Phase 3: Download new tracks (can take 30+ minutes for large playlists)
   if (newTracks.length > 0) {
     console.log(`[spotdl] Downloading ${newTracks.length} new tracks...`);
     try {
@@ -117,21 +117,24 @@ export async function processSpotifyJob(playlist) {
   }
 
   // Phase 4: Create Track + PlaylistTrack records
+  // Wrapped in withReauth — long downloads may cause the admin token to expire.
   let tracksAdded = 0;
 
   // Link existing tracks that aren't already linked
   for (const { trackId, position } of existingTrackIds) {
-    const existingLink = await pb.collection("playlist_tracks").getList(1, 1, {
-      filter: `playlist = "${playlistId}" && track = "${trackId}"`,
-    });
-    if (existingLink.totalItems === 0) {
-      await pb.collection("playlist_tracks").create({
-        playlist: playlistId,
-        track: trackId,
-        position,
-        added_at: new Date().toISOString(),
+    await withReauth(async () => {
+      const existingLink = await pb.collection("playlist_tracks").getList(1, 1, {
+        filter: `playlist = "${playlistId}" && track = "${trackId}"`,
       });
-    }
+      if (existingLink.totalItems === 0) {
+        await pb.collection("playlist_tracks").create({
+          playlist: playlistId,
+          track: trackId,
+          position,
+          added_at: new Date().toISOString(),
+        });
+      }
+    });
   }
 
   // Create records for new tracks
@@ -153,33 +156,41 @@ export async function processSpotifyJob(playlist) {
           f.includes(meta._title?.slice(0, 10) || ""),
       );
       if (match) {
-        fileMeta = await parseFileMetadata(join(outputDir, match));
+        fileMeta = await parseFileMetadata(join(outputDir, match), {
+          title: meta._title,
+          artist: meta._artist,
+          album: meta.album?.name || null,
+          durationMs: Math.round((meta.duration || 0) * 1000),
+          isrc: meta._isrc,
+        });
       }
     } catch {
-      // Fall back to spotdl metadata
+      // Fall back to spotdl metadata (already set in fileMeta defaults)
     }
 
-    // Create track record
-    const track = await pb.collection("tracks").create({
-      title: fileMeta.title,
-      artist: fileMeta.artist,
-      album: meta.album?.name || fileMeta.album || null,
-      platform: "spotify",
-      platform_id: meta._platformId || meta.track_id || "",
-      duration_ms: fileMeta.durationMs || Math.round((meta.duration || 0) * 1000),
-      isrc: fileMeta.isrc || null,
-      cover_url: meta.cover_url || meta.cover?.url || null,
-    });
+    await withReauth(async () => {
+      // Create track record
+      const track = await pb.collection("tracks").create({
+        title: fileMeta.title,
+        artist: fileMeta.artist,
+        album: meta.album?.name || fileMeta.album || null,
+        platform: "spotify",
+        platform_id: meta._platformId || meta.track_id || "",
+        duration_ms: fileMeta.durationMs || Math.round((meta.duration || 0) * 1000),
+        isrc: fileMeta.isrc || null,
+        cover_url: meta.cover_url || meta.cover?.url || null,
+      });
 
-    // Create playlist_track relation
-    await pb.collection("playlist_tracks").create({
-      playlist: playlistId,
-      track: track.id,
-      position: trackList.indexOf(meta) + 1,
-      added_at: new Date().toISOString(),
-    });
+      // Create playlist_track relation
+      await pb.collection("playlist_tracks").create({
+        playlist: playlistId,
+        track: track.id,
+        position: trackList.indexOf(meta) + 1,
+        added_at: new Date().toISOString(),
+      });
 
-    tracksAdded++;
+      tracksAdded++;
+    });
   }
 
   return {

@@ -17,7 +17,7 @@ export default function PlaylistDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { playlist, loading, error } = usePlaylist(id);
+  const { playlist, loading, error, refetch: fetchPlaylist } = usePlaylist(id);
   const { user } = useAuth();
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
@@ -46,7 +46,9 @@ export default function PlaylistDetailPage({
       }
 
       router.refresh();
-      window.location.reload();
+      // After initiating sync, refetch the playlist data to show updated state
+      // without a destructive full-page reload.
+      fetchPlaylist();
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : "Sync failed");
     } finally {
@@ -75,7 +77,7 @@ export default function PlaylistDetailPage({
         )}
         <div className="mt-4 flex gap-3">
           {error && (
-            <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+            <Button variant="secondary" size="sm" onClick={() => fetchPlaylist()}>
               Retry
             </Button>
           )}

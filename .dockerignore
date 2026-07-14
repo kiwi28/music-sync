@@ -11,3 +11,4 @@ Dockerfile
 pocketbase.exe
 pocketbase.Dockerfile
 docker-compose.yml
+.claude

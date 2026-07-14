@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/components/layout/providers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,15 @@ export function AddPlaylistDialog({ open, onClose, onCreated }: AddPlaylistDialo
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reset form state when the dialog opens (fixes stale values on reopen)
+  useEffect(() => {
+    if (open) {
+      setUrl("");
+      setName("");
+      setError(null);
+    }
+  }, [open]);
 
   const detectedPlatform: Platform | null = url ? detectPlatformFromUrl(url) : null;
   const meta = detectedPlatform ? PLATFORM_META[detectedPlatform] : null;
@@ -53,13 +62,26 @@ export function AddPlaylistDialog({ open, onClose, onCreated }: AddPlaylistDialo
         return;
       }
 
-      await pb.collection("playlists").create({
+      const record = await pb.collection("playlists").create({
         name: playlistName,
         url,
         platform: detectedPlatform,
         platform_id: platformId,
         user: userId,
       });
+
+      // Trigger immediate background sync — the worker picks up the
+      // pending job and downloads tracks. Sync survives tab close.
+      try {
+        await fetch("/api/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playlistId: record.id }),
+        });
+      } catch {
+        // Sync trigger failure is non-blocking — the playlist was saved.
+        // User can manually sync later from the playlist detail page.
+      }
 
       setUrl("");
       setName("");

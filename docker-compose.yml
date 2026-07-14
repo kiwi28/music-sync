@@ -28,6 +28,7 @@ services:
       - PB_SUPERUSER_PASSWORD=${PB_SUPERUSER_PASSWORD:-change-me}
       - MUSIC_DIR=/music
       - POLL_INTERVAL=15000
+      - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES:-10080}
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -43,11 +44,32 @@ services:
       - NODE_ENV=production
       - POCKETBASE_URL=http://pocketbase:8090
       - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
     depends_on:
       pocketbase:
         condition: service_healthy
     restart: unless-stopped
 
+  # ── Navidrome music streamer ──
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: musicsync-navidrome
+    volumes:
+      - music:/music:ro
+      - navidrome_data:/data
+    environment:
+      ND_MUSICFOLDER: /music
+      ND_PORT: 4533
+      ND_LOGLEVEL: info
+      ND_ENABLETRANSCODINGCONFIG: "true"
+      ND_ENABLESHARING: "true"
+      # First-time setup: create an admin user via the web UI at spoty.kiw.ro
+      # Or set ND_ADMINUSER / ND_ADMINPASSWORD env vars for headless setup.
+    ports:
+      - "127.0.0.1:4533:4533"
+    restart: unless-stopped
+
 volumes:
   pb_data:
   music:
+  navidrome_data:
