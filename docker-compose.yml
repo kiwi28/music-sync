@@ -41,6 +41,7 @@ services:
     ports:
       - "127.0.0.1:3100:3100"
     environment:
+      - PORT=3100
       - NODE_ENV=production
       - POCKETBASE_URL=http://pocketbase:8090
       - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
