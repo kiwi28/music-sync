@@ -8,9 +8,10 @@ import type { Playlist } from "@/lib/types";
 
 interface PlaylistCardProps {
   playlist: Playlist;
+  isSyncing?: boolean;
 }
 
-export function PlaylistCard({ playlist }: PlaylistCardProps) {
+export function PlaylistCard({ playlist, isSyncing }: PlaylistCardProps) {
   const meta = PLATFORM_META[playlist.platform] ?? {
     label: playlist.platform,
     color: "bg-white/20",
@@ -60,10 +61,14 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
 
           {/* Meta */}
           <div className="flex flex-col items-end gap-1.5">
-            {!playlist.last_synced && (
+            {isSyncing ? (
+              <span className="flex items-center gap-1.5 text-[11px] text-amber-400/80">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                Syncing…
+              </span>
+            ) : !playlist.last_synced ? (
               <span className="text-[11px] text-amber-400/60">Needs sync</span>
-            )}
-            {playlist.last_synced && (
+            ) : (
               <Badge variant="success">
                 Synced {timeAgo(playlist.last_synced)}
               </Badge>

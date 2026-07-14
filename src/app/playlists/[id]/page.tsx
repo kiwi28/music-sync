@@ -1,9 +1,9 @@
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { usePlaylist } from "@/hooks/use-playlists";
+import { usePlaylist, useActiveSyncJob } from "@/hooks/use-playlists";
 import { useAuth } from "@/components/layout/providers";
 import { TrackList } from "@/components/playlists/track-list";
 import { Button } from "@/components/ui/button";
@@ -20,16 +20,23 @@ export default function PlaylistDetailPage({
   const { playlist, loading, error, refetch: fetchPlaylist } = usePlaylist(id);
   const { user } = useAuth();
   const router = useRouter();
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
+  const {
+    activeJob,
+    loading: syncStatusLoading,
+    refetch: refetchSyncStatus,
+  } = useActiveSyncJob(playlist?.id);
 
   const tracks = playlist?.expand?.playlist_tracks_via_playlist ?? [];
   const meta = playlist ? PLATFORM_META[playlist.platform] : null;
 
   async function handleSync() {
     if (!playlist || !user) return;
-    setSyncing(true);
-    setSyncError(null);
+
+    // If a job is already active, just refresh the status — don't POST
+    if (activeJob) {
+      refetchSyncStatus();
+      return;
+    }
 
     try {
       const res = await fetch("/api/sync", {
@@ -41,18 +48,22 @@ export default function PlaylistDetailPage({
       });
 
       if (!res.ok) {
+        // 409 = race condition: a job was created between polls.
+        // Refresh the active job instead of showing an error.
+        if (res.status === 409) {
+          refetchSyncStatus();
+          return;
+        }
         const data = await res.json();
         throw new Error(data.error || "Sync failed");
       }
 
+      // Job created — immediately poll for it so the button updates
+      refetchSyncStatus();
       router.refresh();
-      // After initiating sync, refetch the playlist data to show updated state
-      // without a destructive full-page reload.
       fetchPlaylist();
     } catch (err) {
-      setSyncError(err instanceof Error ? err.message : "Sync failed");
-    } finally {
-      setSyncing(false);
+      console.error("[handleSync]", err);
     }
   }
 
@@ -157,11 +168,30 @@ export default function PlaylistDetailPage({
 
         {/* Sync action */}
         <div className="flex flex-col items-end gap-2">
-          <Button onClick={handleSync} disabled={syncing}>
-            {syncing ? "Syncing…" : "Sync Now"}
-          </Button>
-          {syncError && (
-            <p className="text-xs text-red-400">{syncError}</p>
+          {activeJob?.status === "running" ? (
+            <Button disabled className="cursor-not-allowed opacity-70">
+              <span className="mr-1.5 h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+              Sync in progress…
+            </Button>
+          ) : activeJob?.status === "pending" ? (
+            <Button disabled variant="secondary">
+              Sync queued…
+            </Button>
+          ) : (
+            <Button onClick={handleSync} disabled={syncStatusLoading}>
+              Sync Now
+            </Button>
+          )}
+
+          {/* Live status badge */}
+          {activeJob && (
+            <Badge
+              variant={activeJob.status === "running" ? "warning" : "default"}
+            >
+              {activeJob.status === "running"
+                ? "Downloading tracks…"
+                : "Waiting for worker…"}
+            </Badge>
           )}
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { usePlaylists } from "@/hooks/use-playlists";
+import { usePlaylists, useActiveSyncJobs } from "@/hooks/use-playlists";
 import { PlaylistCard, PlaylistCardSkeleton } from "@/components/playlists/playlist-card";
 import { AddPlaylistDialog } from "@/components/playlists/add-playlist-dialog";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ export default function PlaylistsPage() {
     })),
   ];
 
+  const { syncingIds } = useActiveSyncJobs();
   const syncedCount = playlists.filter((p) => p.last_synced != null).length;
 
   return (
@@ -43,6 +44,7 @@ export default function PlaylistsPage() {
           <p className="mt-1 text-sm text-white/40">
             {playlists.length} playlist{playlists.length !== 1 ? "s" : ""}
             {syncedCount > 0 && ` · ${syncedCount} synced`}
+            {syncingIds.size > 0 && ` · ${syncingIds.size} syncing`}
           </p>
         </div>
         <Button onClick={() => setShowAddDialog(true)}>Add Playlist</Button>
@@ -74,7 +76,13 @@ export default function PlaylistsPage() {
       <div className="space-y-3">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => <PlaylistCardSkeleton key={i} />)
-          : filtered.map((p) => <PlaylistCard key={p.id} playlist={p} />)}
+          : filtered.map((p) => (
+              <PlaylistCard
+                key={p.id}
+                playlist={p}
+                isSyncing={syncingIds.has(p.id)}
+              />
+            ))}
       </div>
 
       {!loading && filtered.length === 0 && !search && (
