@@ -53,6 +53,8 @@ export interface PlaylistTrack {
 
 export interface SyncJob {
   id: string;
+  created: string;
+  updated: string;
   playlist: string;
   user: string;
   status: SyncStatus;
