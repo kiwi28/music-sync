@@ -1,21 +1,21 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * Fix: Remove broken listRule/viewRule on sync_jobs.
+ * Fix: Remove broken listRule/viewRule on sync_jobs (defense-in-depth).
  *
- * PocketBase 0.28.x throws 400 "Something went wrong" for list queries
- * on collections where listRule compares a relation field (user) to
- * @request.auth.id. The playlists collection works, but sync_jobs does
- * not (likely due to the additional playlist relation field causing
- * internal rule evaluation errors).
+ * PocketBase 0.28.1 has a bug where the sync_jobs collection throws 400
+ * "Something went wrong" for queries that reference the `created` system
+ * field — whether in `sort` ("-created" or "created") or in filter
+ * comparisons (`created < "..."`). This affects ALL clients including
+ * the admin/superuser.
  *
- * Since the client code ALWAYS filters by user = "${user.id}" and the
- * Next.js proxy adds user filtering as defense-in-depth, setting the
- * rules to empty is safe — no data leak.
+ * As defense-in-depth we also clear listRule/viewRule. The client code
+ * ALWAYS filters by user = "${user.id}" and the proxy adds user
+ * filtering, so this is safe.
  *
- * The worker also has a related fix: expand="playlist" is removed from
- * the poll query because that pattern also triggers the 400 error in
- * PB 0.28.x.
+ * Related fixes (in the same commit):
+ * - worker: removed sort/created-filter from all sync_jobs queries
+ * - frontend hooks: removed sort, sort results client-side instead
  */
 migrate(($app) => {
   const collection = $app.findCollectionByNameOrId("sync_jobs");

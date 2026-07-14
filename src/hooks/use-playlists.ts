@@ -82,14 +82,16 @@ export function useSyncJobs(limit = 10) {
     }
     try {
       setLoading(true);
-      // NOTE: expand=playlist is omitted — PocketBase 0.28.x returns 400
-      // "Something went wrong" with expand on sync_jobs. The playlist name
-      // is displayed from the cached playlist list instead.
+      // NOTE: PB 0.28.x returns 400 if sync_jobs queries use sort
+      // (the `created` field reference triggers an internal SQLite error).
+      // Sort on the client side instead.
       const records = await pb.collection("sync_jobs").getList<SyncJob>(1, limit, {
         filter: `user = "${user.id}"`,
-        sort: "-created",
       });
-      setJobs(records.items);
+      const sorted = [...records.items].sort(
+        (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+      );
+      setJobs(sorted);
     } catch (err) {
       console.error("[useSyncJobs] Failed to fetch sync jobs:", err);
       // Gracefully degrade — sync history is non-critical
@@ -125,7 +127,7 @@ export function useActiveSyncJob(playlistId: string | undefined) {
     try {
       const result = await pb.collection("sync_jobs").getList<SyncJob>(1, 1, {
         filter: `playlist = "${playlistId}" && (status = "pending" || status = "running")`,
-        sort: "-created",
+        // NOTE: PB 0.28.x 400 bug — omit sort on sync_jobs
       });
       setActiveJob(result.items[0] ?? null);
     } catch (err) {

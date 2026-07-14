@@ -28,13 +28,22 @@ const HANDLERS = {
 };
 
 // ── Startup: reset stale "running" jobs ──
+// NOTE: PB 0.28.x throws 400 if sync_jobs queries reference `created`
+// in sort or filter. We fetch all running jobs without referencing
+// created, then filter stale ones in JS.
 async function resetStaleJobs(pb) {
-  const tenMinutesAgo = new Date(
-    Date.now() - 10 * 60 * 1000,
-  ).toISOString();
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
 
-  const staleJobs = await pb.collection("sync_jobs").getFullList({
-    filter: `status = "running" && created < "${tenMinutesAgo}"`,
+  // Fetch without sort/filter-on-created — PB 0.28.x workaround.
+  // Use getList (not getFullList) to avoid skipTotal=1 which may also
+  // trigger the 400 bug on sync_jobs.
+  const runningJobs = await pb.collection("sync_jobs").getList(1, 100, {
+    filter: 'status = "running"',
+  });
+
+  const staleJobs = runningJobs.items.filter((job) => {
+    const created = new Date(job.created).getTime();
+    return created < tenMinutesAgo;
   });
 
   for (const job of staleJobs) {
@@ -141,12 +150,11 @@ async function main() {
 
   while (true) {
     try {
-      // NOTE: expand: "playlist" is omitted — PB 0.28.x returns 400
-      // with expand on sync_jobs. The playlist is fetched separately
-      // in processJob() instead.
+      // NOTE: expand/sort on sync_jobs is broken in PB 0.28.x — returns 400.
+      // The playlist is fetched separately in processJob() instead of expand,
+      // and we omit sort to avoid the 400 bug (sort references `created`).
       const jobs = await pb.collection("sync_jobs").getList(1, 5, {
         filter: 'status = "pending"',
-        sort: "created",
       });
 
       for (const job of jobs.items) {

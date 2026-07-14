@@ -94,10 +94,10 @@ export default function SettingsPage() {
                     await pb.collection("playlists").delete(p.id);
                   }
 
-                  const jobs = await pb.collection("sync_jobs").getFullList({
+                  const jobs = await pb.collection("sync_jobs").getList(1, 500, {
                     filter: `user = "${user.id}"`,
                   });
-                  for (const j of jobs) {
+                  for (const j of jobs.items) {
                     await pb.collection("sync_jobs").delete(j.id);
                   }
 

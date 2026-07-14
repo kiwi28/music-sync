@@ -1,0 +1,1 @@
+- [SSL — certbot domains](memory/ssl-certbot-domains.md) — How to add a new subdomain to the existing certbot certificate

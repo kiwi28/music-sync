@@ -88,7 +88,11 @@ const playlist = await pb.collection("playlists").getOne(id, {
 // Access: playlist.expand?.playlist_tracks_via_playlist?.[0].expand?.track
 ```
 
-**Note:** `expand=playlist` on `sync_jobs` is broken in PB 0.28.x and the listRule/viewRule are intentionally empty due to the same PB bug. The client and proxy always filter by user, so this is safe. Do not re-add expand or listRule on sync_jobs without testing against PB 0.28.x first.
+**CRITICAL — PB 0.28.x bug:** Using `sort` on `sync_jobs` queries (or referencing the `created` field in filters) returns 400 "Something went wrong" in PocketBase 0.28.1. This affects ALL clients, including admin/superuser. Workarounds:
+- Omit `sort` from sync_jobs queries — sort results in application code instead
+- Omit `expand` from sync_jobs queries — fetch related records separately
+- Do not reference `created` in sync_jobs filters — filter in application code
+- The listRule/viewRule are intentionally empty on sync_jobs (see migration `1785100000_fix_sync_jobs_rules.js`)
 
 ## Rule P7: Filter Syntax Reference
 
