@@ -69,3 +69,32 @@ export interface SyncJob {
     playlist?: Playlist;
   };
 }
+
+// ── Spotify API types (used by lib/spotify.ts) ──
+
+export interface SpotifyTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token?: string;
+  scope?: string;
+}
+
+export interface SpotifyPlaylist {
+  id: string;
+  name: string;
+  description?: string;
+  images?: { url: string }[];
+  tracks: { total: number };
+  owner: { id: string; display_name?: string };
+}
+
+export interface SpotifyTrack {
+  id: string;
+  name: string;
+  type: string;
+  artists: { name: string }[];
+  album?: { name: string; images?: { url: string }[] };
+  duration_ms: number;
+  external_ids?: { isrc?: string };
+}
