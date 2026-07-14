@@ -88,7 +88,7 @@ const playlist = await pb.collection("playlists").getOne(id, {
 // Access: playlist.expand?.playlist_tracks_via_playlist?.[0].expand?.track
 ```
 
-**Known bug:** `expand=playlist` on `sync_jobs` returns 400 in PocketBase 0.28.x. Do not use it. See `use-playlists.ts` for the workaround comment.
+**Note:** `expand=playlist` on `sync_jobs` is broken in PB 0.28.x and the listRule/viewRule are intentionally empty due to the same PB bug. The client and proxy always filter by user, so this is safe. Do not re-add expand or listRule on sync_jobs without testing against PB 0.28.x first.
 
 ## Rule P7: Filter Syntax Reference
 

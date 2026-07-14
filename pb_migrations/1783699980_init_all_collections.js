@@ -89,8 +89,11 @@ migrate(($app) => {
   const syncJobs = new Collection({
     name: "sync_jobs",
     type: "base",
-    listRule: "user = @request.auth.id",
-    viewRule: "user = @request.auth.id",
+    // listRule/viewRule left empty — PB 0.28.x has a bug where relation-field
+    // comparison in rules causes 400 on list queries for collections with
+    // multiple relation fields. Client & proxy always filter by user anyway.
+    listRule: "",
+    viewRule: "",
     createRule: "@request.auth.id != ''",
     updateRule: "user = @request.auth.id",
     deleteRule: "user = @request.auth.id",

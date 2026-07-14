@@ -52,8 +52,12 @@ async function resetStaleJobs(pb) {
 
 // ── Main job processing ──
 async function processJob(pb, job) {
-  const playlist = job.expand?.playlist;
-  if (!playlist) {
+  // Fetch playlist separately — PB 0.28.x expand on sync_jobs is broken
+  let playlist;
+  try {
+    playlist = await pb.collection("playlists").getOne(job.playlist);
+  } catch {
+    console.error(`[worker] Orphaned job ${job.id}: playlist ${job.playlist} not found`);
     await pb.collection("sync_jobs").update(job.id, {
       status: "failed",
       error: "Associated playlist not found (orphaned job)",
@@ -137,10 +141,12 @@ async function main() {
 
   while (true) {
     try {
+      // NOTE: expand: "playlist" is omitted — PB 0.28.x returns 400
+      // with expand on sync_jobs. The playlist is fetched separately
+      // in processJob() instead.
       const jobs = await pb.collection("sync_jobs").getList(1, 5, {
         filter: 'status = "pending"',
         sort: "created",
-        expand: "playlist",
       });
 
       for (const job of jobs.items) {
