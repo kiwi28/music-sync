@@ -183,13 +183,30 @@ export default function PlaylistDetailPage({
             </Button>
           )}
 
+          {/* Live progress / error */}
+          {activeJob && (
+            <div className="max-w-xs rounded-lg border border-white/10 bg-white/5 p-2.5 text-right">
+              {activeJob.log && (
+                <p className="text-xs text-white/60">{activeJob.log}</p>
+              )}
+              {activeJob.error && (
+                <p className="mt-1 text-xs text-red-400">{activeJob.error}</p>
+              )}
+              {activeJob.status === "failed" && !activeJob.error && (
+                <p className="text-xs text-red-400">Sync failed — check worker logs</p>
+              )}
+            </div>
+          )}
+
           {/* Live status badge */}
           {activeJob && (
             <Badge
-              variant={activeJob.status === "running" ? "warning" : "default"}
+              variant={activeJob.status === "running" ? "warning" : activeJob.status === "failed" ? "danger" : "default"}
             >
               {activeJob.status === "running"
                 ? "Downloading tracks…"
+                : activeJob.status === "failed"
+                ? "Sync failed"
                 : "Waiting for worker…"}
             </Badge>
           )}
