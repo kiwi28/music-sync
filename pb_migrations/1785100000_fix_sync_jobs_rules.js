@@ -18,14 +18,20 @@
  * - frontend hooks: removed sort, sort results client-side instead
  */
 migrate(($app) => {
-  const collection = $app.findCollectionByNameOrId("sync_jobs");
-  collection.listRule = "";
-  collection.viewRule = "";
-  $app.save(collection);
+  // PB 0.28.x 400 bug: collections with relation-field listRules can
+  // throw "Something went wrong" on queries. Clear the rules since
+  // client/proxy always filter by user anyway.
+  for (const name of ["sync_jobs", "user_connections"]) {
+    const collection = $app.findCollectionByNameOrId(name);
+    collection.listRule = "";
+    collection.viewRule = "";
+    $app.save(collection);
+  }
 }, ($app) => {
-  // Rollback: restore original rules
-  const collection = $app.findCollectionByNameOrId("sync_jobs");
-  collection.listRule = "user = @request.auth.id";
-  collection.viewRule = "user = @request.auth.id";
-  $app.save(collection);
+  for (const name of ["sync_jobs", "user_connections"]) {
+    const collection = $app.findCollectionByNameOrId(name);
+    collection.listRule = "user = @request.auth.id";
+    collection.viewRule = "user = @request.auth.id";
+    $app.save(collection);
+  }
 });

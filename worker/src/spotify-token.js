@@ -25,10 +25,10 @@ const TOKEN_URL = "https://accounts.spotify.com/api/token";
  * @returns {Promise<string>} - The valid access token
  */
 export async function ensureSpotifyToken(pb) {
-  // Read tokens from PocketBase (any user's connection — single-user setup)
+  // Read tokens from PocketBase (any user's connection — single-user setup).
+  // NOTE: no sort — PB 0.28.x throws 400 on sort with certain collections.
   const connections = await pb.collection("user_connections").getList(1, 1, {
     filter: 'platform = "spotify"',
-    sort: "-created",
   });
 
   if (connections.items.length === 0) {

@@ -5,8 +5,10 @@ migrate(($app) => {
   const userConnections = new Collection({
     name: "user_connections",
     type: "base",
-    listRule: "user = @request.auth.id",
-    viewRule: "user = @request.auth.id",
+    // listRule/viewRule left empty — PB 0.28.x 400 bug workaround (see
+    // 1785100000_fix_sync_jobs_rules.js). Client always filters by user.
+    listRule: "",
+    viewRule: "",
     createRule: "@request.auth.id != ''",
     updateRule: "user = @request.auth.id",
     deleteRule: "user = @request.auth.id",

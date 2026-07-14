@@ -101,17 +101,18 @@ export async function GET(request: Request) {
       Date.now() + tokens.expires_in * 1000
     ).toISOString();
 
-    // Check for existing connection to this platform
+    // Check for existing connection to this platform.
+    // Use getList (not getFullList) — PB 0.28.x 400 bug on certain collections.
     const existingConnections = await pb
       .collection("user_connections")
-      .getFullList({
+      .getList(1, 10, {
         filter: `user = "${userId}" && platform = "spotify"`,
       });
 
-    if (existingConnections.length > 0) {
+    if (existingConnections.items.length > 0) {
       // Update existing connection
       await pb.collection("user_connections").update(
-        existingConnections[0].id,
+        existingConnections.items[0].id,
         {
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
