@@ -95,8 +95,14 @@ async function processJob(pb, job) {
     return;
   }
 
+  // Progress callback — handler calls this at each phase so the
+  // frontend polling can show what's happening in real time.
+  const updateProgress = (msg) => {
+    pb.collection("sync_jobs").update(job.id, { log: msg }).catch(() => {});
+  };
+
   try {
-    const result = await handler(playlist);
+    const result = await handler(playlist, updateProgress);
 
     // Job completed successfully
     await pb.collection("sync_jobs").update(job.id, {

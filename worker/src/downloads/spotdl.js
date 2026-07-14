@@ -21,7 +21,7 @@ const MUSIC_DIR = process.env.MUSIC_DIR || "/music";
 /**
  * Process a Spotify playlist sync job.
  */
-export async function processSpotifyJob(playlist) {
+export async function processSpotifyJob(playlist, onProgress) {
   const pb = await getAdminClient();
   const playlistId = playlist.id;
   const url = playlist.url;
@@ -35,6 +35,7 @@ export async function processSpotifyJob(playlist) {
 
   // Phase 1: Fetch metadata with `spotdl save`
   const metadataFile = join("/tmp", `sync_${playlistId}.spotdl.json`);
+  onProgress?.(`Fetching track list from Spotify…`);
   console.log(`[spotdl] Fetching metadata for "${playlist.name}"...`);
 
   try {
@@ -61,6 +62,7 @@ export async function processSpotifyJob(playlist) {
   }
 
   console.log(`[spotdl] Got metadata for ${trackList.length} tracks`);
+  onProgress?.(`Found ${trackList.length} tracks, checking for new ones…`);
 
   // Phase 2: Dedup against PocketBase
   const existingTrackIds = [];
@@ -100,6 +102,7 @@ export async function processSpotifyJob(playlist) {
   }
 
   console.log(`[spotdl] ${existingTrackIds.length} existing, ${newTracks.length} new (of ${trackList.length})`);
+  onProgress?.(`Downloading ${newTracks.length} new tracks (${existingTrackIds.length} already synced)…`);
 
   // Phase 3: Download new tracks (can take 30+ minutes for large playlists)
   if (newTracks.length > 0) {
@@ -118,6 +121,7 @@ export async function processSpotifyJob(playlist) {
 
   // Phase 4: Create Track + PlaylistTrack records
   // Wrapped in withReauth — long downloads may cause the admin token to expire.
+  onProgress?.(`Creating track records…`);
   let tracksAdded = 0;
 
   // Link existing tracks that aren't already linked

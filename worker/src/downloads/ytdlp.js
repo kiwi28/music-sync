@@ -22,7 +22,7 @@ const MUSIC_DIR = process.env.MUSIC_DIR || "/music";
 /**
  * Process a YouTube Music playlist sync job.
  */
-export async function processYoutubeMusicJob(playlist) {
+export async function processYoutubeMusicJob(playlist, onProgress) {
   const pb = await getAdminClient();
   const playlistId = playlist.id;
   const url = playlist.url;
@@ -35,6 +35,7 @@ export async function processYoutubeMusicJob(playlist) {
   await ensureDir(outputDir);
 
   // Phase 1: Fetch playlist metadata
+  onProgress?.(`Fetching track list from YouTube Music…`);
   console.log(`[yt-dlp] Fetching playlist metadata for "${playlist.name}"...`);
 
   let rawEntries;
@@ -61,6 +62,7 @@ export async function processYoutubeMusicJob(playlist) {
   }
 
   console.log(`[yt-dlp] Got metadata for ${rawEntries.length} tracks`);
+  onProgress?.(`Found ${rawEntries.length} tracks, checking for new ones…`);
 
   // Transform entries into a consistent shape
   const trackList = rawEntries.map((entry, index) => ({
@@ -97,6 +99,7 @@ export async function processYoutubeMusicJob(playlist) {
   }
 
   console.log(`[yt-dlp] ${existingTrackIds.length} existing, ${newTracks.length} new (of ${trackList.length})`);
+  onProgress?.(`Downloading ${newTracks.length} new tracks (${existingTrackIds.length} already synced)…`);
 
   // Phase 3: Download all tracks as MP3
   if (newTracks.length > 0) {
@@ -118,6 +121,7 @@ export async function processYoutubeMusicJob(playlist) {
   }
 
   // Phase 4: Create Track + PlaylistTrack records
+  onProgress?.(`Creating track records…`);
   let tracksAdded = 0;
 
   // Link existing tracks — wrapped in withReauth for token expiry during long downloads
