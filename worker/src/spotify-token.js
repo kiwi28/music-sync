@@ -24,11 +24,13 @@ const TOKEN_URL = "https://accounts.spotify.com/api/token";
  * @param {object} pb - PocketBase admin client
  * @returns {Promise<string>} - The valid access token
  */
-export async function ensureSpotifyToken(pb) {
-  // Read tokens from PocketBase (any user's connection — single-user setup).
+export async function ensureSpotifyToken(pb, userId) {
+  // Read tokens from PocketBase filtered by the playlist owner.
+  // Falls back to any Spotify connection if no userId provided (backward compat).
   // NOTE: no sort — PB 0.28.x throws 400 on sort with certain collections.
+  const userFilter = userId ? ` && user = "${userId}"` : "";
   const connections = await pb.collection("user_connections").getList(1, 1, {
-    filter: 'platform = "spotify"',
+    filter: `platform = "spotify"${userFilter}`,
   });
 
   if (connections.items.length === 0) {
@@ -43,6 +45,10 @@ export async function ensureSpotifyToken(pb) {
   // Refresh if expired (or about to expire in 5 minutes)
   const expiresAt = token_expires_at ? new Date(token_expires_at).getTime() : 0;
   if (Date.now() > expiresAt - 5 * 60 * 1000) {
+    const reason = token_expires_at
+      ? `expired at ${token_expires_at}`
+      : "no expiry set";
+    console.log(`[spotify-token] Refreshing token (${reason})…`);
     const refreshed = await refreshSpotifyToken(refresh_token);
     access_token = refreshed.access_token;
     if (refreshed.refresh_token) refresh_token = refreshed.refresh_token;

@@ -7,8 +7,8 @@
 //   5. Create Track + PlaylistTrack records in PocketBase
 
 import { execFile } from "node:child_process";
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, unlink } from "node:fs/promises";
+import { join, extname } from "node:path";
 import { promisify } from "node:util";
 
 import { getAdminClient, withReauth } from "../pb-client.js";
@@ -112,11 +112,31 @@ export async function processYoutubeMusicJob(playlist, onProgress) {
         "-f", "bestaudio",
         "--embed-metadata",
         "--embed-thumbnail",
+        "--no-write-thumbnail",
+        "--concurrent-fragments", "1",
+        "--sleep-requests", "1",
+        "--sleep-interval", "3",
+        "--max-sleep", "8",
         "-o", join(outputDir, "%(playlist_index)02d - %(title)s.%(ext)s"),
         url,
-      ], { timeout: 1_800_000 });
+      ], { timeout: 7_200_000 }); // 2h timeout for large playlists
     } catch (err) {
       throw new Error(`yt-dlp download failed: ${err.message}`);
+    }
+
+    // Clean up leftover files — yt-dlp sometimes leaves .webm (failed conversion)
+    // and .webp/.jpg thumbnails when embed processing doesn't clean up.
+    try {
+      const allFiles = await readdir(outputDir);
+      for (const file of allFiles) {
+        const ext = extname(file).toLowerCase();
+        if (ext === ".webm" || ext === ".webp" || ext === ".jpg" || ext === ".jpeg" || ext === ".png") {
+          await unlink(join(outputDir, file));
+          console.log(`[yt-dlp] Cleaned up leftover: ${file}`);
+        }
+      }
+    } catch {
+      // Non-critical — cleanup failure shouldn't fail the job
     }
   }
 

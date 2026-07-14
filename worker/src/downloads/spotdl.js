@@ -42,8 +42,10 @@ async function fetchPlaylistTracks(accessToken, playlistId, onProgress) {
       const err = await response.text();
       // Private playlist / needs auth
       if (response.status === 401 || response.status === 403 || response.status === 404) {
+        console.error(`[spotdl] Spotify API ${response.status} for playlist ${playlistId}: ${err}`);
         throw new Error(
-          "Cannot access this Spotify playlist. It may be private or require authentication. " +
+          `Cannot access this Spotify playlist (HTTP ${response.status}). ` +
+          "It may be private or require authentication. " +
           "Go to Settings → Connect Spotify to link your account."
         );
       }
@@ -73,7 +75,7 @@ export async function processSpotifyJob(playlist, onProgress) {
   // Get a valid Spotify access token from PocketBase
   let accessToken;
   try {
-    accessToken = await ensureSpotifyToken(pb);
+    accessToken = await ensureSpotifyToken(pb, playlist.user);
   } catch (err) {
     throw new Error(`Spotify auth: ${err.message}`);
   }
