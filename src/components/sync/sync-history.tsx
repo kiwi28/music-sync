@@ -73,6 +73,11 @@ export function SyncHistory({ jobs, loading }: SyncHistoryProps) {
                         -{job.tracks_removed}
                       </span>
                     )}
+                    {(job.failed_count ?? 0) > 0 && (
+                      <span className="text-xs text-amber-400 tabular-nums">
+                        ⚠ {job.failed_count}
+                      </span>
+                    )}
                   </div>
                   {(job.log || job.error) && (
                     <div className="mt-1.5 border-t border-white/5 pt-1.5">

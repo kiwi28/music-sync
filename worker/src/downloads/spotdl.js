@@ -497,6 +497,7 @@ export async function processSpotifyJob(playlist, onProgress) {
     return {
       tracksAdded,
       totalTracks: trackList.length,
+      failedTracks,
     };
   }
 
@@ -612,5 +613,6 @@ export async function processSpotifyJob(playlist, onProgress) {
   return {
     tracksAdded,
     totalTracks: totalFiles,
+    failedTracks: [], // fallback path doesn't track per-track failures
   };
 }

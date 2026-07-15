@@ -149,13 +149,20 @@ async function processJob(pb, job) {
   try {
     const result = await handler(playlist, updateProgress);
 
-    // Job completed successfully
-    await pb.collection("sync_jobs").update(job.id, {
+    // Job completed successfully.
+    // The handler's last onProgress call already wrote the full summary
+    // (including failure details) to the log field. We only update the
+    // structured fields here — don't overwrite log.
+    const failedCount = result.failedTracks?.length || 0;
+    const updateFields = {
       status: "completed",
       completed_at: new Date().toISOString(),
       tracks_added: result.tracksAdded,
-      log: `Sync complete. ${result.tracksAdded} new, ${result.totalTracks} total.`,
-    });
+    };
+    if (failedCount > 0) {
+      updateFields.failed_count = failedCount;
+    }
+    await pb.collection("sync_jobs").update(job.id, updateFields);
 
     // Update playlist stats
     await pb.collection("playlists").update(playlist.id, {
@@ -164,7 +171,8 @@ async function processJob(pb, job) {
     });
 
     console.log(
-      `[worker] Job ${job.id} completed: +${result.tracksAdded} tracks`,
+      `[worker] Job ${job.id} completed: +${result.tracksAdded} tracks` +
+      (failedCount > 0 ? `, ${failedCount} failed` : ""),
     );
   } catch (err) {
     console.error(`[worker] Job ${job.id} failed:`, err);
