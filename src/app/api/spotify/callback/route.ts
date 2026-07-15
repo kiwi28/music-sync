@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { fetchSpotifyProfile } from "@/lib/spotify";
+import { getPublicOrigin } from "@/lib/url-utils";
+
+/**
+ * Build an absolute URL for redirecting the user's browser.
+ * Uses getPublicOrigin() to reconstruct the public-facing URL from
+ * X-Forwarded-* headers (set by nginx), avoiding the Docker-internal hostname.
+ */
+function redirectUrl(request: Request, path: string): string {
+  return `${getPublicOrigin(request)}${path}`;
+}
 
 /**
  * GET /api/spotify/callback
@@ -16,25 +26,19 @@ export async function GET(request: Request) {
 
   // Check for user-denied authorization
   if (error) {
-    return NextResponse.redirect(
-      new URL("/settings?error=spotify_auth_denied", request.url)
-    );
+    return NextResponse.redirect(redirectUrl(request, "/settings?error=spotify_auth_denied"));
   }
 
   // Validate required params
   if (!code || !state) {
-    return NextResponse.redirect(
-      new URL("/settings?error=missing_params", request.url)
-    );
+    return NextResponse.redirect(redirectUrl(request, "/settings?error=missing_params"));
   }
 
   // Verify state to prevent CSRF
   const cookieStore = await cookies();
   const savedState = cookieStore.get("spotify_auth_state");
   if (!savedState || savedState.value !== state) {
-    return NextResponse.redirect(
-      new URL("/settings?error=csrf_mismatch", request.url)
-    );
+    return NextResponse.redirect(redirectUrl(request, "/settings?error=csrf_mismatch"));
   }
 
   // Clear the state cookie
@@ -44,9 +48,7 @@ export async function GET(request: Request) {
     // 1. Get server PocketBase client and verify user is logged in
     const pb = await createServerClient();
     if (!pb.authStore.isValid) {
-      return NextResponse.redirect(
-        new URL("/login?error=not_authenticated", request.url)
-      );
+      return NextResponse.redirect(redirectUrl(request, "/login?error=not_authenticated"));
     }
 
     const userId = pb.authStore.record!.id;
@@ -57,9 +59,7 @@ export async function GET(request: Request) {
     const redirectUri = process.env.SPOTIFY_REDIRECT_URI;
 
     if (!clientId || !clientSecret || !redirectUri) {
-      return NextResponse.redirect(
-        new URL("/settings?error=spotify_not_configured", request.url)
-      );
+      return NextResponse.redirect(redirectUrl(request, "/settings?error=spotify_not_configured"));
     }
 
     const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
@@ -78,9 +78,7 @@ export async function GET(request: Request) {
     if (!tokenResponse.ok) {
       const errText = await tokenResponse.text();
       console.error("Spotify token exchange failed:", errText);
-      return NextResponse.redirect(
-        new URL("/settings?error=token_exchange_failed", request.url)
-      );
+      return NextResponse.redirect(redirectUrl(request, "/settings?error=token_exchange_failed"));
     }
 
     const tokens = await tokenResponse.json();
@@ -91,9 +89,7 @@ export async function GET(request: Request) {
       profile = await fetchSpotifyProfile(tokens.access_token);
     } catch (err) {
       console.error("Failed to fetch Spotify profile:", err);
-      return NextResponse.redirect(
-        new URL("/settings?error=profile_fetch_failed", request.url)
-      );
+      return NextResponse.redirect(redirectUrl(request, "/settings?error=profile_fetch_failed"));
     }
 
     // 4. Store or update the connection in PocketBase
@@ -135,16 +131,11 @@ export async function GET(request: Request) {
     }
 
     // 5. Redirect back to settings with success
-    return NextResponse.redirect(
-      new URL("/settings?success=spotify_connected", request.url)
-    );
+    return NextResponse.redirect(redirectUrl(request, "/settings?success=spotify_connected"));
   } catch (err) {
     console.error("Spotify callback error:", err);
     return NextResponse.redirect(
-      new URL(
-        `/settings?error=${encodeURIComponent("internal_error")}`,
-        request.url
-      )
+      redirectUrl(request, `/settings?error=${encodeURIComponent("internal_error")}`)
     );
   }
 }
