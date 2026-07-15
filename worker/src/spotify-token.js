@@ -18,6 +18,16 @@ const CACHE_DIR = join(homedir(), ".spotdl");
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
 
 /**
+ * Path to the spotipy OAuth cache file that spotdl reads natively.
+ * spotdl uses spotipy internally, which looks for this cache file based
+ * on the SPOTIPY_CLIENT_USERNAME env var (set to "spotify" in entrypoint.sh).
+ * Format: ~/.spotdl/.spotipy-cache-{username}
+ *
+ * We also export this so spotdl.js can pass it as --auth-token as a fallback.
+ */
+export const TOKEN_CACHE_FILE = join(CACHE_DIR, ".spotipy-cache-spotify");
+
+/**
  * Ensure valid Spotify tokens are available in spotdl's cache.
  * Reads tokens from PocketBase, refreshes if expired, writes cache file.
  *
@@ -66,9 +76,8 @@ export async function ensureSpotifyToken(pb, userId) {
 
   // Write the token to a file that spotdl reads via --auth-token flag.
   await mkdir(CACHE_DIR, { recursive: true });
-  const cacheFile = join(CACHE_DIR, "token.json");
   await writeFile(
-    cacheFile,
+    TOKEN_CACHE_FILE,
     JSON.stringify({
       access_token,
       token_type: "Bearer",
