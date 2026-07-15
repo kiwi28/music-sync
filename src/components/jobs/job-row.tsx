@@ -45,7 +45,7 @@ export function JobRow({
   const platform = job.expand?.playlist?.platform;
   const meta = platform ? PLATFORM_META[platform] : null;
 
-  async function handleAction(action: string, fn: () => Promise<void>) {
+  async function handleAction(action: string, fn: () => unknown) {
     setActionLoading(action);
     try {
       await fn();
