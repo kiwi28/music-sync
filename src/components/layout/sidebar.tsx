@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./providers";
-import { Headphones, House, Music, Settings } from "lucide-react";
+import { Activity, Headphones, House, Music, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", Icon: House },
+  { href: "/jobs", label: "Jobs", Icon: Activity },
   { href: "/playlists", label: "Playlists", Icon: Music },
   { href: "/settings", label: "Settings", Icon: Settings },
 ] as const;

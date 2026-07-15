@@ -438,14 +438,14 @@ After implementation, verify:
   - [x] Task 6: GET /api/jobs
   - [x] Task 7: GET/PATCH/DELETE /api/jobs/[id]
   - [x] Task 8: POST /api/jobs/[id]/retry + GET /api/worker/status
-- [ ] Phase 2: Jobs Page + Components
-  - [ ] Task 9: useJobs and useWorkerStatus hooks
-  - [ ] Task 10: Job action functions (cancel/delete/retry)
-  - [ ] Task 11: JobRow component
-  - [ ] Task 12: WorkerStatusBar component
-  - [ ] Task 13: /jobs page
-  - [ ] Task 14: Sidebar nav item
+- [x] Phase 2: Jobs Page + Components
+  - [x] Task 9: useJobs and useWorkerStatus hooks
+  - [x] Task 10: Job action functions (cancel/delete/retry)
+  - [x] Task 11: JobRow component
+  - [x] Task 12: WorkerStatusBar component
+  - [x] Task 13: /jobs page
+  - [x] Task 14: Sidebar nav item
 - [ ] Phase 3: Real-Time + Toasts
-  - [ ] Task 15: Toast system (Toast + ToastProvider)
+  - [x] Task 15: Toast system (Toast + ToastProvider)
 - [ ] Phase 4: Polish
-  - [ ] Task 16: SyncHistory + playlist detail enhancements
+  - [x] Task 16: SyncHistory + playlist detail enhancements

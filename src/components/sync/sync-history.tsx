@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/utils";
@@ -21,7 +22,17 @@ export function SyncHistory({ jobs, loading }: SyncHistoryProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Syncs</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Recent Syncs</CardTitle>
+          {jobs.length > 0 && (
+            <Link
+              href="/jobs"
+              className="text-xs text-white/40 underline underline-offset-4 hover:text-white/70"
+            >
+              View all
+            </Link>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -39,9 +50,10 @@ export function SyncHistory({ jobs, loading }: SyncHistoryProps) {
             {jobs.map((job) => {
               const status = STATUS_BADGE[job.status] ?? STATUS_BADGE.failed;
               return (
-                <div
+                <Link
                   key={job.id}
-                  className="rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5"
+                  href={`/jobs?highlight=${job.id}`}
+                  className="block rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 hover:bg-white/[0.04] transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant={status.variant}>{status.label}</Badge>
@@ -72,7 +84,7 @@ export function SyncHistory({ jobs, loading }: SyncHistoryProps) {
                       )}
                     </div>
                   )}
-                </div>
+                </Link>
               );
             })}
           </div>

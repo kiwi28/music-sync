@@ -2,6 +2,7 @@
 
 import { useAuth } from "./providers";
 import { Sidebar } from "./sidebar";
+import { ToastProvider } from "./toast-provider";
 import { LoginPage } from "@/components/auth/login-page";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -20,9 +21,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="ml-56 flex-1 px-8 py-6">{children}</main>
-    </div>
+    <ToastProvider>
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <main className="ml-56 flex-1 px-8 py-6">{children}</main>
+      </div>
+    </ToastProvider>
   );
 }

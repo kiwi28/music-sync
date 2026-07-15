@@ -210,6 +210,14 @@ export default function PlaylistDetailPage({
                 : "Waiting for worker…"}
             </Badge>
           )}
+
+          {/* Link to jobs page for this playlist */}
+          <Link
+            href={`/jobs?playlistId=${playlist.id}`}
+            className="text-xs text-white/40 underline underline-offset-4 hover:text-white/60"
+          >
+            View all jobs →
+          </Link>
         </div>
       </div>
 
