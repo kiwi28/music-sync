@@ -1,36 +1,56 @@
 // Spotify playlist download handler.
 // Uses Spotify Web API for metadata (via OAuth tokens in PocketBase)
-// and spotdl for downloading audio from YouTube.
+// and per-track yt-dlp downloads for audio from YouTube.
 //
-// Flow:
+// Flow (API path — when Spotify OAuth works):
 //   1. Get Spotify access token from PocketBase (user_connections)
 //   2. Fetch track metadata via Spotify Web API
 //   3. Deduplicate against existing tracks in PocketBase
-//   4. Download new tracks via spotdl (no auth needed for YT downloads)
+//   4. Download each NEW track individually via yt-dlp search
 //   5. Create Track + PlaylistTrack records in PocketBase
+//
+// Flow (fallback — when Spotify API is unavailable):
+//   1. Bulk download via spotdl (which handles auth + matching internally)
+//   2. Scan downloaded files for metadata
+//   3. Create Track + PlaylistTrack records with post-hoc dedup
+//
+// Per-track downloads (API path) give live "[X of Y]" progress in the
+// frontend, matching the YouTube Music sync experience.
 
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
-import { join } from "node:path";
-import { promisify } from "node:util";
+import { join, extname } from "node:path";
 
 import { getAdminClient, withReauth } from "../pb-client.js";
 import { findExistingTrack } from "../dedup.js";
 import { parseFileMetadata } from "../metadata.js";
-import { ensureDir, sanitizeFolderName, generateM3u } from "../utils.js";
+import { ensureDir, sanitizeFolderName, generateM3u, sleep } from "../utils.js";
 import { ensureSpotifyToken } from "../spotify-token.js";
 
-const execFileAsync = promisify(execFile);
 const MUSIC_DIR = process.env.MUSIC_DIR || "/music";
 const SPOTIFY_API = "https://api.spotify.com/v1";
+
+/** Timeout per individual track download (5 minutes). */
+const TRACK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Delay between individual track downloads to avoid rate limiting. */
+const INTER_TRACK_DELAY_MS = 2000;
+
+/** Timeout for bulk spotdl download (30 minutes). */
+const SPOTDL_BULK_TIMEOUT_MS = 1_800_000;
+
+// ── Spotify API helpers ──
 
 /**
  * Fetch all tracks from a Spotify playlist via the Web API.
  * Handles pagination (max 100 tracks per request).
+ * Throws on auth/permission errors so the caller can fall back.
  */
 async function fetchPlaylistTracks(accessToken, playlistId, onProgress) {
   const tracks = [];
-  let url = `${SPOTIFY_API}/playlists/${playlistId}/tracks?limit=100`;
+  // Use /items (not /tracks) — Spotify deprecated /tracks in newer API versions
+  // and returns 403 for it, even with valid OAuth scopes.
+  let url = `${SPOTIFY_API}/playlists/${playlistId}/items?limit=100`;
 
   while (url) {
     onProgress?.(`Fetching tracks from Spotify (${tracks.length} so far)…`);
@@ -40,7 +60,6 @@ async function fetchPlaylistTracks(accessToken, playlistId, onProgress) {
 
     if (!response.ok) {
       const err = await response.text();
-      // Private playlist / needs auth
       if (response.status === 401 || response.status === 403 || response.status === 404) {
         console.error(`[spotdl] Spotify API ${response.status} for playlist ${playlistId}: ${err}`);
         throw new Error(
@@ -54,8 +73,16 @@ async function fetchPlaylistTracks(accessToken, playlistId, onProgress) {
 
     const data = await response.json();
     for (const item of data.items) {
-      if (item.track) {
-        tracks.push(item.track);
+      // /items endpoint wraps the track in `item.item` (with `item.item.track: true`).
+      // /tracks endpoint (deprecated) used `item.track` directly.
+      // We support both formats for backward compat.
+      const track = item.track && item.track.type === "track"
+        ? item.track
+        : item.item?.type === "track"
+          ? item.item
+          : null;
+      if (track) {
+        tracks.push(track);
       }
     }
     url = data.next;
@@ -63,6 +90,134 @@ async function fetchPlaylistTracks(accessToken, playlistId, onProgress) {
 
   return tracks;
 }
+
+// ── Per-track download (API path) ──
+
+/**
+ * Download a single track by searching YouTube.
+ * Uses yt-dlp with a search query, matching spotdl's internal approach.
+ * Returns { ok: true, filePath } on success, { ok: false, reason } on failure.
+ */
+function downloadSingleTrack(artist, title, outputDir, paddedIndex) {
+  return new Promise((resolve) => {
+    const outputTemplate = join(
+      outputDir,
+      `${paddedIndex} - %(title)s.%(ext)s`,
+    );
+    const searchQuery = `ytsearch1:${artist} - ${title}`;
+
+    const proc = spawn("yt-dlp", [
+      "-x",
+      "--audio-format", "mp3",
+      "--audio-quality", "0",
+      "-f", "bestaudio",
+      "--embed-metadata",
+      "--embed-thumbnail",
+      "--no-write-thumbnail",
+      "-o", outputTemplate,
+      searchQuery,
+    ], {
+      timeout: TRACK_DOWNLOAD_TIMEOUT_MS,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stderr = "";
+
+    proc.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on("close", async (code) => {
+      if (code !== 0) {
+        const reason = extractDownloadError(stderr);
+        resolve({ ok: false, reason });
+        return;
+      }
+
+      // Find the downloaded file
+      try {
+        const files = await readdir(outputDir);
+        const match = files.find(
+          (f) => f.startsWith(`${paddedIndex} - `) && f.endsWith(".mp3"),
+        );
+        if (match) {
+          resolve({ ok: true, filePath: join(outputDir, match) });
+        } else {
+          resolve({ ok: false, reason: "Download completed but MP3 file not found" });
+        }
+      } catch {
+        resolve({ ok: false, reason: "Could not read output directory" });
+      }
+    });
+
+    proc.on("error", (err) => {
+      resolve({ ok: false, reason: `Process error: ${err.message}` });
+    });
+  });
+}
+
+/**
+ * Extract a human-readable error reason from a yt-dlp exec failure.
+ */
+function extractDownloadError(stderr) {
+  const msg = stderr || "";
+
+  if (msg.includes("HTTP Error 429")) return "HTTP 429 — rate limited";
+  if (msg.includes("HTTP Error 403")) return "HTTP 403 — forbidden (geo-blocked?)";
+  if (msg.includes("HTTP Error 404")) return "HTTP 404 — video not found";
+  if (msg.includes("Video unavailable")) return "Video unavailable";
+  if (msg.includes("Private video")) return "Private video";
+  if (msg.includes("Sign in to confirm your age")) return "Age-restricted (requires login)";
+  if (msg.includes("ETIMEDOUT") || msg.includes("ESOCKETTIMEDOUT")) return "Network timeout";
+
+  const short = msg.split("\n").find(l => l.includes("ERROR") || l.includes("WARNING")) || msg.split("\n")[0];
+  return short?.slice(0, 120) || "Unknown download error";
+}
+
+// ── Bulk download (fallback path) ──
+
+/**
+ * Run spotdl as a bulk download, streaming its stdout/stderr to the
+ * console so progress is visible in Docker logs.
+ * Resolves when spotdl exits, rejects on non-zero exit.
+ */
+function runSpotdlBulk(args) {
+  return new Promise((resolve, reject) => {
+    console.log(`[spotdl] Bulk download: spotdl ${args.join(" ")}`);
+    const proc = spawn("spotdl", args, {
+      timeout: SPOTDL_BULK_TIMEOUT_MS,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    proc.stdout.on("data", (data) => {
+      const lines = data.toString().trim().split("\n");
+      for (const line of lines) {
+        if (line.trim()) console.log(`[spotdl] ${line.trim()}`);
+      }
+    });
+
+    proc.stderr.on("data", (data) => {
+      const lines = data.toString().trim().split("\n");
+      for (const line of lines) {
+        if (line.trim()) console.warn(`[spotdl:err] ${line.trim()}`);
+      }
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`spotdl exited with code ${code}`));
+      }
+    });
+
+    proc.on("error", (err) => {
+      reject(new Error(`spotdl process error: ${err.message}`));
+    });
+  });
+}
+
+// ── Main job processor ──
 
 /**
  * Process a Spotify playlist sync job.
@@ -87,17 +242,14 @@ export async function processSpotifyJob(playlist, onProgress) {
   );
   await ensureDir(outputDir);
 
-  // Phase 1: Fetch track metadata via Spotify Web API.
-  // This gives us accurate metadata (ISRC, album art, etc.) and enables
-  // pre-download dedup. If the API fails (e.g. token scope issues, app dev
-  // mode), we fall back to downloading everything and scanning files after.
-  onProgress?.(`Fetching track list from Spotify…`);
-  console.log(`[spotdl] Fetching tracks for "${playlist.name}" via Spotify API…`);
-
   const platformId = playlist.platform_id;
   if (!platformId) {
     throw new Error("Playlist has no platform_id — cannot fetch from Spotify API");
   }
+
+  // ── Phase 1: Try Spotify API for track metadata ──
+  onProgress?.(`Fetching track list from Spotify…`);
+  console.log(`[spotdl] Fetching tracks for "${playlist.name}" via Spotify API…`);
 
   let trackList = [];
   let spotifyApiFailed = false;
@@ -105,7 +257,7 @@ export async function processSpotifyJob(playlist, onProgress) {
     trackList = await fetchPlaylistTracks(accessToken, platformId, onProgress);
   } catch (err) {
     console.warn(`[spotdl] Spotify API unavailable: ${err.message}`);
-    console.warn(`[spotdl] Falling back to download-only mode (no pre-download dedup)`);
+    console.warn(`[spotdl] Falling back to bulk spotdl download (no per-track progress)`);
     spotifyApiFailed = true;
   }
 
@@ -113,27 +265,14 @@ export async function processSpotifyJob(playlist, onProgress) {
     throw new Error("Spotify returned empty track list — playlist may be empty or private");
   }
 
-  // ── Phase 2: Download via spotdl ──
-  // We ALWAYS run spotdl (whether or not the API gave us metadata).
-  // spotdl handles its own track matching and metadata embedding.
-  // The OAuth token is persisted to ~/.spotdl/.spotipy-cache-spotify by
-  // ensureSpotifyToken(), and spotdl's config has user_auth: true so it
-  // reads that cache file automatically.
-  const spotdlArgs = [
-    "download", url,
-    "--output", join(outputDir, "{artist} - {title}.{output-ext}"),
-    "--format", "mp3",
-    "--bitrate", "320k",
-  ];
-
-  // If we have API metadata, use --save-file to also dump metadata for
-  // post-download matching (spotdl writes the track list to this file).
-  // Otherwise we scan files manually after download.
+  // ═══════════════════════════════════════════════════════════════════
+  // PATH A: API worked — per-track download with [X/Y] progress
+  // ═══════════════════════════════════════════════════════════════════
   if (!spotifyApiFailed && trackList.length > 0) {
     console.log(`[spotdl] Got metadata for ${trackList.length} tracks`);
     onProgress?.(`Found ${trackList.length} tracks, checking for new ones…`);
 
-    // Phase 2a: Dedup against PocketBase (only possible with API metadata)
+    // Dedup against PocketBase
     const existingTrackIds = [];
     const newTracks = [];
 
@@ -172,94 +311,188 @@ export async function processSpotifyJob(playlist, onProgress) {
     }
 
     console.log(`[spotdl] ${existingTrackIds.length} existing, ${newTracks.length} new (of ${trackList.length})`);
-    onProgress?.(`Downloading ${newTracks.length} new tracks (${existingTrackIds.length} already synced)…`);
 
     // Link existing tracks that aren't already linked
-    for (const { trackId, position } of existingTrackIds) {
-      await withReauth(async () => {
-        const existingLink = await pb.collection("playlist_tracks").getList(1, 1, {
-          filter: `playlist = "${playlistId}" && track = "${trackId}"`,
-        });
-        if (existingLink.totalItems === 0) {
-          await pb.collection("playlist_tracks").create({
-            playlist: playlistId,
-            track: trackId,
-            position,
-            added_at: new Date().toISOString(),
+    if (existingTrackIds.length > 0) {
+      onProgress?.(`Linking ${existingTrackIds.length} existing tracks…`);
+      for (const { trackId, position } of existingTrackIds) {
+        await withReauth(async () => {
+          const existingLink = await pb.collection("playlist_tracks").getList(1, 1, {
+            filter: `playlist = "${playlistId}" && track = "${trackId}"`,
           });
-        }
-      });
-    }
-
-    // Phase 2b: Download new tracks via spotdl
-    if (newTracks.length > 0) {
-      console.log(`[spotdl] Downloading ${newTracks.length} new tracks...`);
-      try {
-        await execFileAsync("spotdl", spotdlArgs, { timeout: 1_800_000 });
-      } catch (err) {
-        throw new Error(`spotdl download failed: ${err.message}`);
+          if (existingLink.totalItems === 0) {
+            await pb.collection("playlist_tracks").create({
+              playlist: playlistId,
+              track: trackId,
+              position,
+              added_at: new Date().toISOString(),
+            });
+          }
+        });
       }
     }
 
-    // Phase 3: Create Track + PlaylistTrack records for new tracks
-    onProgress?.(`Creating track records…`);
+    // Per-track download with live [X/Y] progress
     let tracksAdded = 0;
+    const failedTracks = [];
 
-    for (const [index, meta] of newTracks.entries()) {
-      let fileMeta = {
-        title: meta._title,
-        artist: meta._artist,
-        album: meta._album,
-        durationMs: meta._durationMs,
-        isrc: meta._isrc,
-      };
+    if (newTracks.length > 0) {
+      for (let i = 0; i < newTracks.length; i++) {
+        const meta = newTracks[i];
+        const trackNum = i + 1;
+        const totalNew = newTracks.length;
+        const paddedIndex = String(trackList.indexOf(
+          trackList.find((t) => t.id === meta._platformId)
+        ) + 1).padStart(2, "0");
 
-      // Try to read metadata from the downloaded file for richer tags
-      try {
-        const files = await readdir(outputDir);
-        const match = files.find(
-          (f) =>
-            f.includes(meta._artist?.slice(0, 10) || "") ||
-            f.includes(meta._title?.slice(0, 10) || ""),
-        );
-        if (match) {
-          fileMeta = await parseFileMetadata(join(outputDir, match), {
-            title: meta._title,
-            artist: meta._artist,
-            album: meta._album,
-            durationMs: meta._durationMs,
-            isrc: meta._isrc,
-          });
+        // Live progress: "[12/45] Artist - Title"
+        const progressLabel = `[${trackNum}/${totalNew}] ${meta._artist?.slice(0, 25)} - ${meta._title?.slice(0, 50)}`;
+        onProgress?.(progressLabel);
+        console.log(`[spotdl] ${progressLabel}`);
+
+        // Check if file already exists (resume after crash)
+        let alreadyOnDisk = false;
+        try {
+          const existing = await readdir(outputDir);
+          const match = existing.find(
+            (f) => f.startsWith(`${paddedIndex} - `) && f.endsWith(".mp3"),
+          );
+          if (match) {
+            console.log(`[spotdl] Track ${trackNum} already on disk: ${match}`);
+            alreadyOnDisk = true;
+
+            // Parse metadata from existing file
+            const fileMeta = await parseFileMetadata(join(outputDir, match), {
+              title: meta._title,
+              artist: meta._artist,
+              album: meta._album,
+              durationMs: meta._durationMs,
+              isrc: meta._isrc,
+            });
+
+            try {
+              await withReauth(async () => {
+                const track = await pb.collection("tracks").create({
+                  title: fileMeta.title,
+                  artist: fileMeta.artist,
+                  album: meta._album || fileMeta.album || null,
+                  platform: "spotify",
+                  platform_id: meta._platformId || "",
+                  duration_ms: fileMeta.durationMs || meta._durationMs,
+                  isrc: fileMeta.isrc || null,
+                  cover_url: meta._coverUrl,
+                });
+                await pb.collection("playlist_tracks").create({
+                  playlist: playlistId,
+                  track: track.id,
+                  position: trackList.indexOf(
+                    trackList.find((t) => t.id === meta._platformId)
+                  ) + 1,
+                  added_at: new Date().toISOString(),
+                });
+              });
+              tracksAdded++;
+            } catch (err) {
+              console.warn(`[spotdl] PB error for existing file ${meta._title}: ${err.message}`);
+            }
+            continue;
+          }
+        } catch {
+          // Directory might not exist yet
         }
-      } catch {
-        // Fall back to Spotify metadata (already set in fileMeta defaults)
+
+        if (alreadyOnDisk) continue;
+
+        // Download the track
+        const result = await downloadSingleTrack(
+          meta._artist,
+          meta._title,
+          outputDir,
+          paddedIndex,
+        );
+
+        if (!result.ok) {
+          failedTracks.push({
+            index: trackList.indexOf(
+              trackList.find((t) => t.id === meta._platformId)
+            ) + 1,
+            title: meta._title,
+            reason: result.reason,
+          });
+          console.warn(`[spotdl] FAILED #${paddedIndex} "${meta._title}": ${result.reason}`);
+          continue;
+        }
+
+        // Parse metadata from the downloaded file
+        const fileMeta = await parseFileMetadata(result.filePath, {
+          title: meta._title,
+          artist: meta._artist,
+          album: meta._album,
+          durationMs: meta._durationMs,
+          isrc: meta._isrc,
+        });
+
+        // Create track + playlist_track records
+        try {
+          await withReauth(async () => {
+            const track = await pb.collection("tracks").create({
+              title: fileMeta.title,
+              artist: fileMeta.artist,
+              album: meta._album || fileMeta.album || null,
+              platform: "spotify",
+              platform_id: meta._platformId || "",
+              duration_ms: fileMeta.durationMs || meta._durationMs,
+              isrc: fileMeta.isrc || null,
+              cover_url: meta._coverUrl,
+            });
+
+            await pb.collection("playlist_tracks").create({
+              playlist: playlistId,
+              track: track.id,
+              position: trackList.indexOf(
+                trackList.find((t) => t.id === meta._platformId)
+              ) + 1,
+              added_at: new Date().toISOString(),
+            });
+          });
+
+          tracksAdded++;
+        } catch (err) {
+          failedTracks.push({
+            index: trackList.indexOf(
+              trackList.find((t) => t.id === meta._platformId)
+            ) + 1,
+            title: meta._title,
+            reason: `PB error: ${err.message.slice(0, 100)}`,
+          });
+          console.error(`[spotdl] PB error "${meta._title}": ${err.message}`);
+        }
+
+        // Small delay between tracks to avoid rate limiting
+        if (i < newTracks.length - 1) {
+          await sleep(INTER_TRACK_DELAY_MS);
+        }
       }
-
-      await withReauth(async () => {
-        const track = await pb.collection("tracks").create({
-          title: fileMeta.title,
-          artist: fileMeta.artist,
-          album: meta._album || fileMeta.album || null,
-          platform: "spotify",
-          platform_id: meta._platformId || "",
-          duration_ms: fileMeta.durationMs || meta._durationMs,
-          isrc: fileMeta.isrc || null,
-          cover_url: meta._coverUrl,
-        });
-
-        await pb.collection("playlist_tracks").create({
-          playlist: playlistId,
-          track: track.id,
-          position: trackList.indexOf(meta) + 1,
-          added_at: new Date().toISOString(),
-        });
-
-        tracksAdded++;
-      });
     }
 
-    // Generate .m3u playlist file for Navidrome local import
+    // ── Cleanup & finalize ──
     await generateM3u(outputDir, playlist.name);
+
+    const totalSynced = tracksAdded + existingTrackIds.length;
+    const summaryLines = [
+      `Sync complete: ${tracksAdded} new + ${existingTrackIds.length} existing = ${totalSynced} total tracks`,
+    ];
+
+    if (failedTracks.length > 0) {
+      summaryLines.push(`${failedTracks.length} tracks failed to download:`);
+      for (const ft of failedTracks) {
+        summaryLines.push(`  #${ft.index} ${ft.title.slice(0, 60)} — ${ft.reason}`);
+      }
+    }
+
+    const summary = summaryLines.join("\n");
+    console.log(`[spotdl] ${summary.replace(/\n/g, " | ")}`);
+    onProgress?.(summary);
 
     return {
       tracksAdded,
@@ -267,12 +500,21 @@ export async function processSpotifyJob(playlist, onProgress) {
     };
   }
 
-  // ── Fallback mode: API unavailable, download everything + scan files ──
-  onProgress?.(`Downloading playlist via spotdl (no pre-dedup)…`);
+  // ═══════════════════════════════════════════════════════════════════
+  // PATH B: API unavailable — bulk spotdl download + scan files
+  // ═══════════════════════════════════════════════════════════════════
+  onProgress?.(`Downloading playlist via spotdl (API unavailable, no per-track progress)…`);
   console.log(`[spotdl] Downloading entire playlist (API unavailable, no pre-filtering)...`);
 
+  const spotdlArgs = [
+    "download", url,
+    "--output", join(outputDir, "{artist} - {title}.{output-ext}"),
+    "--format", "mp3",
+    "--bitrate", "320k",
+  ];
+
   try {
-    await execFileAsync("spotdl", spotdlArgs, { timeout: 1_800_000 });
+    await runSpotdlBulk(spotdlArgs);
   } catch (err) {
     throw new Error(`spotdl download failed: ${err.message}`);
   }
@@ -309,7 +551,7 @@ export async function processSpotifyJob(playlist, onProgress) {
         continue;
       }
 
-      // Dedup by title + artist (no ISRC available from file metadata alone)
+      // Dedup by title + artist
       const existing = await findExistingTrack(pb, {
         isrc: fileMeta.isrc || null,
         title: fileMeta.title,
@@ -319,7 +561,6 @@ export async function processSpotifyJob(playlist, onProgress) {
       });
 
       if (existing) {
-        // Link if not already linked
         await withReauth(async () => {
           const existingLink = await pb.collection("playlist_tracks").getList(1, 1, {
             filter: `playlist = "${playlistId}" && track = "${existing.id}"`,
@@ -336,7 +577,6 @@ export async function processSpotifyJob(playlist, onProgress) {
         continue;
       }
 
-      // Create new track record
       try {
         await withReauth(async () => {
           const track = await pb.collection("tracks").create({
@@ -366,7 +606,6 @@ export async function processSpotifyJob(playlist, onProgress) {
     console.warn(`[spotdl] File scanning error: ${err.message}`);
   }
 
-  // Generate .m3u playlist file for Navidrome local import
   await generateM3u(outputDir, playlist.name);
 
   console.log(`[spotdl] Fallback sync complete: ${tracksAdded} new tracks from ${totalFiles} files`);
