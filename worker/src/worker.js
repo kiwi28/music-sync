@@ -43,8 +43,15 @@ async function resetStaleJobs(pb) {
   });
 
   const staleJobs = runningJobs.items.filter((job) => {
-    const created = new Date(job.created).getTime();
-    return created < tenMinutesAgo;
+    // PB 0.28.x doesn't return the `created` system field for sync_jobs,
+    // so we use `started_at` (set when the worker marks the job as running).
+    // Fall back to `created` for compatibility, then to `updated` as a last resort.
+    const timestamp = job.started_at || job.created || job.updated;
+    if (!timestamp) {
+      console.warn(`[worker] Job ${job.id} has no timestamp — treating as stale`);
+      return true;
+    }
+    return new Date(timestamp).getTime() < tenMinutesAgo;
   });
 
   for (const job of staleJobs) {
@@ -66,8 +73,14 @@ async function resetStaleJobs(pb) {
   });
 
   const stalePendingJobs = pendingJobs.items.filter((job) => {
-    const created = new Date(job.created).getTime();
-    return created < sixtyMinutesAgo;
+    // PB 0.28.x doesn't return `created` or `updated` for sync_jobs.
+    // Without a timestamp we can't determine age — skip rather than falsely
+    // flagging as stale. (Running jobs use `started_at` which IS returned.)
+    const timestamp = job.created || job.updated;
+    if (!timestamp) {
+      return false;
+    }
+    return new Date(timestamp).getTime() < sixtyMinutesAgo;
   });
 
   for (const job of stalePendingJobs) {
