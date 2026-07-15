@@ -14,7 +14,7 @@ import { promisify } from "node:util";
 import { getAdminClient, withReauth } from "../pb-client.js";
 import { findExistingTrack } from "../dedup.js";
 import { parseFileMetadata } from "../metadata.js";
-import { ensureDir, sanitizeFolderName } from "../utils.js";
+import { ensureDir, sanitizeFolderName, generateM3u } from "../utils.js";
 
 const execFileAsync = promisify(execFile);
 const MUSIC_DIR = process.env.MUSIC_DIR || "/music";
@@ -219,6 +219,9 @@ export async function processYoutubeMusicJob(playlist, onProgress) {
 
     tracksAdded++;
   }
+
+  // Generate .m3u playlist file for Navidrome local import
+  await generateM3u(outputDir, playlist.name);
 
   return {
     tracksAdded,

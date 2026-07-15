@@ -11,6 +11,7 @@
 //   - Creates jobs as the PocketBase superuser — no per-user auth needed.
 
 import { getAdminClient } from "./pb-client.js";
+import { updateSchedulerState } from "./heartbeat.js";
 
 const SYNC_INTERVAL_MINUTES = parseInt(
   process.env.SYNC_INTERVAL_MINUTES || "10080", // default: 7 days
@@ -90,6 +91,18 @@ async function schedulerTick() {
     } else {
       console.log(`[scheduler] Enqueued ${enqueued} sync job(s).`);
     }
+
+    // Update scheduler state for UI visibility
+    const staleCount = playlists.filter((p) => {
+      return !p.last_synced || p.last_synced < cutoff;
+    }).length;
+    updateSchedulerState(pb, {
+      syncIntervalMinutes: SYNC_INTERVAL_MINUTES,
+      checkIntervalMs: CHECK_INTERVAL_MS,
+      stalePlaylistCount: staleCount,
+    }).catch((err) =>
+      console.error("[scheduler] Failed to update state:", err.message),
+    );
   } catch (err) {
     console.error("[scheduler] Tick failed:", err.message);
   }

@@ -276,6 +276,40 @@ const stalePendingJobs = await pb.collection("sync_jobs").getList(1, 100, {
 // Filter in JS for jobs older than 60 min, reset them too
 ```
 
+### 5.5 Generate .m3u Playlist File After Download
+
+After a successful sync, generate an `.m3u` file in the playlist's download folder so Navidrome and other players can import it as a local playlist. This runs in both download handlers (`spotdl.js` and `ytdlp.js`) as a final step after all tracks are downloaded.
+
+Implementation (new utility function in `worker/src/utils.js`):
+
+```js
+import { execFile } from "node:child_process";
+import { join } from "node:path";
+
+export function generateM3u(dirPath, playlistName) {
+  return new Promise((resolve, reject) => {
+    const m3uPath = join(dirPath, `${playlistName}.m3u`);
+    // List audio files and write to .m3u in one shell command.
+    // The .m3u format is just a newline-separated list of filenames.
+    execFile(
+      "sh", ["-c", `cd "${dirPath}" && ls *.mp3 *.flac *.m4a 2>/dev/null > "${m3uPath}"`],
+      { timeout: 10000 },
+      (err) => {
+        if (err) {
+          console.error(`[m3u] Failed to generate .m3u for "${playlistName}":`, err.message);
+          resolve(); // Non-fatal — don't fail the sync over a missing .m3u
+        } else {
+          console.log(`[m3u] Generated "${playlistName}.m3u"`);
+          resolve();
+        }
+      }
+    );
+  });
+}
+```
+
+Called at the end of `processSpotifyJob()` and `processYoutubeMusicJob()`, after track records are created and before the job is marked as completed. The `playlistName` is sanitized with the existing `sanitizeFolderName()` utility so the filename is safe.
+
 ---
 
 ## 6. Data Model Changes
@@ -390,3 +424,28 @@ After implementation, verify:
 8. Worker resets stale pending jobs on restart
 9. Dashboard SyncHistory widget still works, links to /jobs
 10. Sidebar has "Jobs" nav item, active state works
+
+---
+
+## 11. Implementation Progress
+
+- [ ] Phase 1: API Routes + Worker Fixes
+  - [x] Task 1: PocketBase migration for worker_status
+  - [x] Task 2: Worker heartbeat module
+  - [x] Task 3: Heartbeat in poll loop + stale pending reset + cancel check
+  - [x] Task 4: Scheduler state tracking
+  - [x] Task 5: .m3u playlist file generation
+  - [x] Task 6: GET /api/jobs
+  - [x] Task 7: GET/PATCH/DELETE /api/jobs/[id]
+  - [x] Task 8: POST /api/jobs/[id]/retry + GET /api/worker/status
+- [ ] Phase 2: Jobs Page + Components
+  - [ ] Task 9: useJobs and useWorkerStatus hooks
+  - [ ] Task 10: Job action functions (cancel/delete/retry)
+  - [ ] Task 11: JobRow component
+  - [ ] Task 12: WorkerStatusBar component
+  - [ ] Task 13: /jobs page
+  - [ ] Task 14: Sidebar nav item
+- [ ] Phase 3: Real-Time + Toasts
+  - [ ] Task 15: Toast system (Toast + ToastProvider)
+- [ ] Phase 4: Polish
+  - [ ] Task 16: SyncHistory + playlist detail enhancements

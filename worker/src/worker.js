@@ -12,6 +12,7 @@ import { processSpotifyJob } from "./downloads/spotdl.js";
 import { processYoutubeMusicJob } from "./downloads/ytdlp.js";
 import { sleep, extractErrorMessage } from "./utils.js";
 import { startScheduler } from "./scheduler.js";
+import { updateHeartbeat } from "./heartbeat.js";
 
 const POLL_INTERVAL_MS = parseInt(
   process.env.POLL_INTERVAL || "15000",
@@ -57,6 +58,28 @@ async function resetStaleJobs(pb) {
   if (staleJobs.length) {
     console.log(`[worker] Reset ${staleJobs.length} stale jobs`);
   }
+
+  // Also reset stale "pending" jobs (older than 60 minutes — stuck)
+  const sixtyMinutesAgo = Date.now() - 60 * 60 * 1000;
+  const pendingJobs = await pb.collection("sync_jobs").getList(1, 100, {
+    filter: 'status = "pending"',
+  });
+
+  const stalePendingJobs = pendingJobs.items.filter((job) => {
+    const created = new Date(job.created).getTime();
+    return created < sixtyMinutesAgo;
+  });
+
+  for (const job of stalePendingJobs) {
+    console.log(`[worker] Resetting stale pending job ${job.id} (stuck >60min)`);
+    await pb.collection("sync_jobs").update(job.id, {
+      log: `${job.log || ""}\nReset — was stuck pending for >60min (worker restart)`,
+    });
+  }
+
+  if (stalePendingJobs.length) {
+    console.log(`[worker] Flagged ${stalePendingJobs.length} stale pending jobs`);
+  }
 }
 
 // ── Main job processing ──
@@ -76,6 +99,15 @@ async function processJob(pb, job) {
   }
 
   console.log(`[worker] Processing job ${job.id}: "${playlist.name}" (${playlist.platform})`);
+
+  // Check if the job was cancelled by the user before we start
+  const freshJob = await pb.collection("sync_jobs").getOne(job.id);
+  if (freshJob.status !== "pending") {
+    console.log(
+      `[worker] Job ${job.id} status is "${freshJob.status}" — skipping (cancelled or already processed)`,
+    );
+    return;
+  }
 
   // Mark as running
   await pb.collection("sync_jobs").update(job.id, {
@@ -166,6 +198,12 @@ async function main() {
       for (const job of jobs.items) {
         await processJob(pb, job);
       }
+
+      // Heartbeat: signal to the UI that the worker is alive
+      updateHeartbeat(pb, {
+        pendingCount: jobs.totalItems,
+        runningCount: 0,
+      }).catch(() => {});
     } catch (err) {
       // Don't crash on transient poll errors — log and retry
       console.error("[worker] Poll error:", err.message);

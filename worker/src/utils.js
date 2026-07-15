@@ -1,6 +1,8 @@
 // Utility helpers for the worker.
 
+import { execFile } from "node:child_process";
 import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 
 /** Sleep for `ms` milliseconds. */
 export function sleep(ms) {
@@ -47,4 +49,35 @@ export function extractErrorMessage(err, maxLen = 500) {
   const msg =
     err instanceof Error ? err.message : String(err || "Unknown error");
   return msg.length > maxLen ? msg.slice(0, maxLen) + "…" : msg;
+}
+
+/**
+ * Generate an .m3u playlist file listing all audio files in a directory.
+ * Useful for Navidrome and other players to import the synced tracks as a
+ * local playlist. Non-fatal — errors are logged but do not fail the sync.
+ */
+export function generateM3u(dirPath, playlistName) {
+  return new Promise((resolve) => {
+    const safeName = sanitizeFolderName(playlistName);
+    const m3uPath = join(dirPath, `${safeName}.m3u`);
+    execFile(
+      "sh",
+      [
+        "-c",
+        `cd "${dirPath}" && ls *.mp3 *.flac *.m4a 2>/dev/null > "${m3uPath}"`,
+      ],
+      { timeout: 10000 },
+      (err) => {
+        if (err) {
+          console.error(
+            `[m3u] Failed to generate .m3u for "${playlistName}":`,
+            err.message,
+          );
+        } else {
+          console.log(`[m3u] Generated "${playlistName}.m3u"`);
+        }
+        resolve();
+      },
+    );
+  });
 }

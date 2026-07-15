@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 import { getAdminClient, withReauth } from "../pb-client.js";
 import { findExistingTrack } from "../dedup.js";
 import { parseFileMetadata } from "../metadata.js";
-import { ensureDir, sanitizeFolderName } from "../utils.js";
+import { ensureDir, sanitizeFolderName, generateM3u } from "../utils.js";
 import { ensureSpotifyToken } from "../spotify-token.js";
 
 const execFileAsync = promisify(execFile);
@@ -236,6 +236,9 @@ export async function processSpotifyJob(playlist, onProgress) {
       tracksAdded++;
     });
   }
+
+  // Generate .m3u playlist file for Navidrome local import
+  await generateM3u(outputDir, playlist.name);
 
   return {
     tracksAdded,
