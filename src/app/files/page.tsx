@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Filemanager, WillowDark } from "@svar-ui/react-filemanager";
-import "@svar-ui/react-filemanager/dist/index.css";
+import "@svar-ui/react-filemanager/all.css";
 import "./files.css";
 
 import { useFileBrowser } from "@/hooks/use-files";
