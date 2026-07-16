@@ -45,7 +45,10 @@ services:
     container_name: musicsync-app
     ports:
       - "127.0.0.1:3100:3100"
+    volumes:
+      - music:/music
     environment:
+      - MUSIC_DIR=/music
       - PORT=3100
       - NODE_ENV=production
       - POCKETBASE_URL=http://pocketbase:8090

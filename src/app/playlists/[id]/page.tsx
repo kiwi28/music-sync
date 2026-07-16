@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLATFORM_META, timeAgo } from "@/lib/utils";
+import { RefreshCw } from "lucide-react";
 
 export default function PlaylistDetailPage({
   params,
@@ -64,6 +65,28 @@ export default function PlaylistDetailPage({
       fetchPlaylist();
     } catch (err) {
       console.error("[handleSync]", err);
+    }
+  }
+
+  async function handleRefreshM3u() {
+    if (!playlist) return;
+    try {
+      const res = await fetch("/api/files/m3u", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlistId: playlist.id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "M3U refresh failed");
+      }
+
+      const { trackCount } = await res.json();
+      // Use a simple alert for now — toast would require the ToastProvider context
+      console.log(`[m3u] Refreshed "${playlist.name}".m3u (${trackCount} tracks)`);
+    } catch (err) {
+      console.error("[handleRefreshM3u]", err);
     }
   }
 
@@ -211,13 +234,23 @@ export default function PlaylistDetailPage({
             </Badge>
           )}
 
-          {/* Link to jobs page for this playlist */}
-          <Link
-            href={`/jobs?playlistId=${playlist.id}`}
-            className="text-xs text-white/40 underline underline-offset-4 hover:text-white/60"
-          >
-            View all jobs →
-          </Link>
+          {/* M3U refresh + jobs link */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRefreshM3u}
+              className="inline-flex items-center gap-1 text-xs text-white/40 underline underline-offset-4 hover:text-white/60"
+              title={`Regenerate ${playlist.name}.m3u`}
+            >
+              <RefreshCw className="h-3 w-3" />
+              Refresh M3U
+            </button>
+            <Link
+              href={`/jobs?playlistId=${playlist.id}`}
+              className="text-xs text-white/40 underline underline-offset-4 hover:text-white/60"
+            >
+              View all jobs →
+            </Link>
+          </div>
         </div>
       </div>
 
