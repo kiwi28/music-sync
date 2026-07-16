@@ -268,12 +268,8 @@ async function main() {
         // Check skip cache — orphaned jobs with failing PB updates
         // get exponential backoff so we do not hot-loop on them.
         const skipEntry = orphanedSkipCache.get(job.id);
-        if (skipEntry) {
-          if (Date.now() < skipEntry.until) {
-            continue; // still cooling off
-          }
-          // backoff expired — clean up and retry once
-          orphanedSkipCache.delete(job.id);
+        if (skipEntry && Date.now() < skipEntry.until) {
+          continue; // still cooling off
         }
         await processJob(pb, job);
       }
