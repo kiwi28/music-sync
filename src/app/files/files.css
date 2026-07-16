@@ -2,6 +2,22 @@
    The WillowDark base provides structural styles; we override colours
    to match the app's neutral-900 / white-opacity palette. */
 
+/* ── Layout fixes ──────────────────────────────────── */
+
+/*
+ * WillowDark wraps children in a plain <div> with no height.
+ * SVAR's .wx-filemanager uses `height: 100%`, which needs every
+ * ancestor to have an explicit height.  Force the WillowDark
+ * wrapper to fill its container so height propagates down.
+ */
+.wx-theme.wx-willow-dark-theme {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Theme overrides ───────────────────────────────── */
+
 .wx-willow-dark-theme {
   /* Theme identity */
   --wx-theme-name: music-sync-dark;
@@ -25,13 +41,40 @@
   --wx-color-primary-selected: rgba(255, 255, 255, 0.08);
   --wx-color-primary-font: #0a0a0a;
 
-  /* Icons */
-  --wx-icon-color: rgba(250, 250, 250, 0.5);
+  /* ── Buttons ── */
   --wx-button-background: rgba(255, 255, 255, 0.08);
-  --wx-fm-button-font-color: rgba(250, 250, 250, 0.5);
+  --wx-button-font-color: rgba(250, 250, 250, 0.7);
+  --wx-button-border: none;
+  --wx-button-border-radius: 6px;
+  --wx-button-padding: 4px 10px;
+  --wx-button-height: 34px;
+  --wx-button-font-size: 13px;
+  --wx-button-font-weight: 500;
 
-  /* Toolbar */
+  /* ── Toolbar & mode selector (top-right dropdown) ── */
+  --wx-fm-button-font-color: rgba(250, 250, 250, 0.6);
   --wx-fm-toolbar-height: 56px;
+  --wx-segmented-background: rgba(255, 255, 255, 0.06);
+  --wx-segmented-background-hover: rgba(255, 255, 255, 0.1);
+  --wx-segmented-border: none;
+  --wx-segmented-border-radius: 8px;
+  --wx-segmented-padding: 2px;
+
+  /* ── Popup / context menu / dropdown ── */
+  --wx-popup-background: #1c1c1c;
+  --wx-popup-border: 1px solid rgba(255, 255, 255, 0.1);
+  --wx-popup-border-radius: 10px;
+  --wx-popup-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --wx-popup-z-index: 60;
+
+  /* ── Table selection ── */
+  --wx-table-select-background: rgba(255, 255, 255, 0.1);
+  --wx-table-select-border: rgba(255, 255, 255, 0.15);
+  --wx-table-select-color: rgba(250, 250, 250, 0.9);
+
+  /* ── Icons ── */
+  --wx-icon-color: rgba(250, 250, 250, 0.5);
+  --wx-icon-size: 22px;
 
   /* Box shadow — none for flat dark look */
   --wx-fm-box-shadow: none;

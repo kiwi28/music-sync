@@ -59,13 +59,17 @@ export function useFileBrowser() {
         const id = path.endsWith("/")
           ? `${path}${entry.name}`
           : `${path}/${entry.name}`;
+        const isFolder = entry.isDirectory;
         return {
           id,
           name: entry.name,
-          type: entry.isDirectory ? ("folder" as const) : ("file" as const),
+          type: isFolder ? ("folder" as const) : ("file" as const),
           size: entry.size,
           date: new Date(),
           ext: entry.ext,
+          // SVAR requires `lazy: true` on folders to fire onRequestData
+          // when the user opens them. Without it, folders show as empty.
+          lazy: isFolder ? true : undefined,
         };
       });
     } catch (err) {

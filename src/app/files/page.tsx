@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Filemanager, WillowDark } from "@svar-ui/react-filemanager";
+import type { IEntity } from "@svar-ui/react-filemanager";
 import "@svar-ui/react-filemanager/all.css";
 import "./files.css";
 
 import { useFileBrowser } from "@/hooks/use-files";
 import { UploadDialog } from "@/components/files/upload-dialog";
-import { RefreshCw, Upload } from "lucide-react";
+import { RefreshCw, Upload, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 
 export default function FilesPage() {
@@ -27,7 +28,35 @@ export default function FilesPage() {
 
   const [currentPath, setCurrentPath] = useState("/");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<IEntity[] | null>(null);
   const apiRef = useRef<any>(null);
+
+  // ── Pre-load root data before rendering Filemanager ───
+  //     SVAR needs data at mount time — we can't race useEffect against init().
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    browse("/")
+      .then((entries) => {
+        if (!cancelled) {
+          setInitialData(entries);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load files");
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [browse]);
 
   // ── SVAR init callback ─────────────────────────────────
 
@@ -42,7 +71,7 @@ export default function FilesPage() {
         if (ev.file?.file) {
           // This is a file upload — intercept and show our dialog
           setUploadDialogOpen(true);
-          return false; // cancel SVAR's default behavior
+          return false; // cancel SVAR's default behaviour
         }
         // Folder creation — let it through
         return true;
@@ -61,26 +90,29 @@ export default function FilesPage() {
   const handleRequestData = useCallback(
     async (ev: { id: string }) => {
       const path = ev.id || "/";
-      const entries = await browse(path);
-      if (apiRef.current) {
-        apiRef.current.exec("provide-data", { id: path, data: entries });
+      try {
+        const entries = await browse(path);
+        if (apiRef.current) {
+          apiRef.current.exec("provide-data", { id: path, data: entries });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Browse failed";
+        addToast("error", msg);
       }
     },
-    [browse],
+    [browse, addToast],
   );
 
   const handleCreateFile = useCallback(
     async (ev: { file: { name: string; type?: string }; parent: string }) => {
       if (ev.file.type === "folder") {
         const newPath = await createFolder(ev.parent, ev.file.name);
-        if (newPath) {
+        if (newPath && apiRef.current) {
           const entries = await browse(ev.parent);
-          if (apiRef.current) {
-            apiRef.current.exec("provide-data", {
-              id: ev.parent,
-              data: entries,
-            });
-          }
+          apiRef.current.exec("provide-data", {
+            id: ev.parent,
+            data: entries,
+          });
         }
       }
     },
@@ -90,8 +122,8 @@ export default function FilesPage() {
   const handleDeleteFiles = useCallback(
     async (ev: { ids: string[] }) => {
       await deleteEntries(ev.ids);
-      const entries = await browse(currentPath);
       if (apiRef.current) {
+        const entries = await browse(currentPath);
         apiRef.current.exec("provide-data", { id: currentPath, data: entries });
       }
     },
@@ -101,8 +133,8 @@ export default function FilesPage() {
   const handleMoveFiles = useCallback(
     async (ev: { ids: string[]; target: string }) => {
       await moveEntries(ev.ids, ev.target);
-      const entries = await browse(currentPath);
       if (apiRef.current) {
+        const entries = await browse(currentPath);
         apiRef.current.exec("provide-data", { id: currentPath, data: entries });
       }
     },
@@ -111,16 +143,30 @@ export default function FilesPage() {
 
   const handleCopyFiles = useCallback(
     async (ev: { ids: string[]; target: string }) => {
-      await copyEntries(ev.ids, ev.target);
+      const ok = await copyEntries(ev.ids, ev.target);
+      if (ok && apiRef.current) {
+        // Refresh the target directory so newly copied files appear
+        apiRef.current.exec("provide-data", {
+          id: ev.target,
+          data: await browse(ev.target),
+        });
+        // Also refresh current path in case we copied within the same folder
+        if (ev.target !== currentPath) {
+          apiRef.current.exec("provide-data", {
+            id: currentPath,
+            data: await browse(currentPath),
+          });
+        }
+      }
     },
-    [copyEntries],
+    [copyEntries, browse, currentPath],
   );
 
   const handleRenameFile = useCallback(
     async (ev: { id: string; name: string }) => {
-      await renameEntry(ev.id, ev.name);
-      const entries = await browse(currentPath);
-      if (apiRef.current) {
+      const newPath = await renameEntry(ev.id, ev.name);
+      if (newPath && apiRef.current) {
+        const entries = await browse(currentPath);
         apiRef.current.exec("provide-data", { id: currentPath, data: entries });
       }
     },
@@ -142,8 +188,8 @@ export default function FilesPage() {
 
   const handleM3uRefresh = useCallback(async () => {
     await refreshM3u(currentPath);
-    const entries = await browse(currentPath);
     if (apiRef.current) {
+      const entries = await browse(currentPath);
       apiRef.current.exec("provide-data", { id: currentPath, data: entries });
     }
   }, [refreshM3u, browse, currentPath]);
@@ -162,16 +208,6 @@ export default function FilesPage() {
     },
     [uploadToPlaylist],
   );
-
-  // ── Initial data load ──────────────────────────────────
-
-  useEffect(() => {
-    browse("/").then((entries) => {
-      if (apiRef.current) {
-        apiRef.current.exec("provide-data", { id: "/", data: entries });
-      }
-    });
-  }, [browse]);
 
   // ── Render ─────────────────────────────────────────────
 
@@ -205,22 +241,52 @@ export default function FilesPage() {
         </div>
       </div>
 
-      {/* File manager */}
-      <div className="flex-1 px-2 pb-2">
-        <WillowDark>
-          <Filemanager
-            init={init}
-            mode="table"
-            preview={false}
-            onRequestData={handleRequestData}
-            onCreateFile={handleCreateFile}
-            onDeleteFiles={handleDeleteFiles}
-            onMoveFiles={handleMoveFiles}
-            onCopyFiles={handleCopyFiles}
-            onRenameFile={handleRenameFile}
-            onDownloadFile={handleDownloadFile}
-          />
-        </WillowDark>
+      {/* File manager area */}
+      <div className="min-h-0 flex-1 px-2 pb-2">
+        {error ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex max-w-md flex-col items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-8 text-center">
+              <AlertTriangle className="h-8 w-8 text-red-400" />
+              <p className="text-sm text-red-400">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setLoading(true);
+                  browse("/").then((entries) => {
+                    setInitialData(entries);
+                    setLoading(false);
+                  });
+                }}
+                className="rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/20"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : loading || !initialData ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+              <p className="text-sm text-white/40">Loading file browser…</p>
+            </div>
+          </div>
+        ) : (
+          <WillowDark>
+            <Filemanager
+              data={initialData}
+              init={init}
+              mode="table"
+              preview={false}
+              onRequestData={handleRequestData}
+              onCreateFile={handleCreateFile}
+              onDeleteFiles={handleDeleteFiles}
+              onMoveFiles={handleMoveFiles}
+              onCopyFiles={handleCopyFiles}
+              onRenameFile={handleRenameFile}
+              onDownloadFile={handleDownloadFile}
+            />
+          </WillowDark>
+        )}
       </div>
 
       {/* Upload dialog */}
