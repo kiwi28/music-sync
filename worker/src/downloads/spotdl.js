@@ -28,6 +28,7 @@ import { ensureDir, sanitizeFolderName, generateM3u, sleep } from "../utils.js";
 import { ensureSpotifyToken } from "../spotify-token.js";
 
 const MUSIC_DIR = process.env.MUSIC_DIR || "/music";
+const YOUTUBE_COOKIES = process.env.YOUTUBE_COOKIES || null;
 const SPOTIFY_API = "https://api.spotify.com/v1";
 
 /** Timeout per individual track download (5 minutes). */
@@ -115,6 +116,7 @@ function downloadSingleTrack(artist, title, outputDir, paddedIndex) {
       "--embed-thumbnail",
       "--no-write-thumbnail",
       "-o", outputTemplate,
+      ...(YOUTUBE_COOKIES ? ["--cookies", YOUTUBE_COOKIES] : []),
       searchQuery,
     ], {
       timeout: TRACK_DOWNLOAD_TIMEOUT_MS,
@@ -513,6 +515,11 @@ export async function processSpotifyJob(playlist, onProgress) {
     "--format", "mp3",
     "--bitrate", "320k",
   ];
+
+  // Pass YouTube cookies for age-restricted tracks in bulk mode
+  if (YOUTUBE_COOKIES) {
+    spotdlArgs.push("--cookie-file", YOUTUBE_COOKIES);
+  }
 
   try {
     await runSpotdlBulk(spotdlArgs);

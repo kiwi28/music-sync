@@ -19,6 +19,19 @@ const POLL_INTERVAL_MS = parseInt(
   10,
 );
 
+// ── Orphaned-job skip cache ──
+// Tracks jobs whose playlist was deleted. When the PB status update fails
+// (e.g. due to collection rules), the job would otherwise stay "pending"
+// forever and get retried every poll cycle. This cache applies exponential
+// backoff so the worker does not hot-loop on unfixable records.
+//
+// Map<jobId, { until: number; attempt: number }>
+//   until   — timestamp (ms) before which the job should be skipped
+//   attempt — consecutive failures (drives backoff: 15s * 2^attempt, max 4h)
+const orphanedSkipCache = new Map();
+const ORPHANED_BASE_BACKOFF_MS = 15_000;           // 15 seconds
+const ORPHANED_MAX_BACKOFF_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 /**
  * Map of platform → handler function.
  * Add new platforms here as downloaders are implemented.
@@ -55,11 +68,17 @@ async function resetStaleJobs(pb) {
   });
 
   for (const job of staleJobs) {
-    console.log(`[worker] Resetting stale job ${job.id} → pending`);
-    await pb.collection("sync_jobs").update(job.id, {
-      status: "pending",
-      log: `${job.log || ""}\nReset from "running" after worker restart`,
-    });
+    console.log(`[worker] Marking stale job ${job.id} as failed (worker was interrupted)`);
+    try {
+      await pb.collection("sync_jobs").update(job.id, {
+        status: "failed",
+        error: "Sync interrupted by worker restart",
+        completed_at: new Date().toISOString(),
+        log: `${job.log || ""}\nMarked as failed after worker restart — interrupted sync.`,
+      });
+    } catch (err) {
+      console.error(`[worker] Failed to update stale job ${job.id}: ${err.message}`);
+    }
   }
 
   if (staleJobs.length) {
@@ -84,10 +103,17 @@ async function resetStaleJobs(pb) {
   });
 
   for (const job of stalePendingJobs) {
-    console.log(`[worker] Resetting stale pending job ${job.id} (stuck >60min)`);
-    await pb.collection("sync_jobs").update(job.id, {
-      log: `${job.log || ""}\nReset — was stuck pending for >60min (worker restart)`,
-    });
+    console.log(`[worker] Marking stale pending job ${job.id} as failed (stuck >60min without being picked up)`);
+    try {
+      await pb.collection("sync_jobs").update(job.id, {
+        status: "failed",
+        error: "Job stuck pending for >60 minutes",
+        completed_at: new Date().toISOString(),
+        log: `${job.log || ""}\nMarked as failed — was stuck pending for >60min.`,
+      });
+    } catch (err) {
+      console.error(`[worker] Failed to update stale pending job ${job.id}: ${err.message}`);
+    }
   }
 
   if (stalePendingJobs.length) {
@@ -103,11 +129,33 @@ async function processJob(pb, job) {
     playlist = await pb.collection("playlists").getOne(job.playlist);
   } catch {
     console.error(`[worker] Orphaned job ${job.id}: playlist ${job.playlist} not found`);
-    await pb.collection("sync_jobs").update(job.id, {
-      status: "failed",
-      error: "Associated playlist not found (orphaned job)",
-      completed_at: new Date().toISOString(),
-    });
+    try {
+      await pb.collection("sync_jobs").update(job.id, {
+        status: "failed",
+        error: "Associated playlist not found (orphaned job)",
+        completed_at: new Date().toISOString(),
+      });
+      // Successfully marked as failed — remove from skip cache if present
+      orphanedSkipCache.delete(job.id);
+    } catch (updateErr) {
+      // PB update itself failed (e.g. collection rule restriction).
+      // Add to skip cache with exponential backoff so we do not retry
+      // every poll cycle.
+      const prev = orphanedSkipCache.get(job.id) || { attempt: 0 };
+      const attempt = prev.attempt + 1;
+      const delay = Math.min(
+        ORPHANED_BASE_BACKOFF_MS * Math.pow(2, attempt),
+        ORPHANED_MAX_BACKOFF_MS,
+      );
+      orphanedSkipCache.set(job.id, {
+        until: Date.now() + delay,
+        attempt,
+      });
+      console.error(
+        `[worker] Failed to update orphaned job ${job.id} — ` +
+        `skipping for ${Math.round(delay / 1000)}s (attempt ${attempt}): ${updateErr.message}`,
+      );
+    }
     return;
   }
 
@@ -217,6 +265,16 @@ async function main() {
       });
 
       for (const job of jobs.items) {
+        // Check skip cache — orphaned jobs with failing PB updates
+        // get exponential backoff so we do not hot-loop on them.
+        const skipEntry = orphanedSkipCache.get(job.id);
+        if (skipEntry) {
+          if (Date.now() < skipEntry.until) {
+            continue; // still cooling off
+          }
+          // backoff expired — clean up and retry once
+          orphanedSkipCache.delete(job.id);
+        }
         await processJob(pb, job);
       }
 

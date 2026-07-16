@@ -1,7 +1,6 @@
 // Utility helpers for the worker.
 
-import { execFile } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /** Sleep for `ms` milliseconds. */
@@ -56,28 +55,34 @@ export function extractErrorMessage(err, maxLen = 500) {
  * Useful for Navidrome and other players to import the synced tracks as a
  * local playlist. Non-fatal — errors are logged but do not fail the sync.
  */
-export function generateM3u(dirPath, playlistName) {
-  return new Promise((resolve) => {
-    const safeName = sanitizeFolderName(playlistName);
-    const m3uPath = join(dirPath, `${safeName}.m3u`);
-    execFile(
-      "sh",
-      [
-        "-c",
-        `cd "${dirPath}" && ls *.mp3 *.flac *.m4a 2>/dev/null > "${m3uPath}"`,
-      ],
-      { timeout: 10000 },
-      (err) => {
-        if (err) {
-          console.error(
-            `[m3u] Failed to generate .m3u for "${playlistName}":`,
-            err.message,
-          );
-        } else {
-          console.log(`[m3u] Generated "${playlistName}.m3u"`);
-        }
-        resolve();
-      },
+export async function generateM3u(dirPath, playlistName) {
+  const safeName = sanitizeFolderName(playlistName);
+  const m3uPath = join(dirPath, `${safeName}.m3u`);
+  const AUDIO_EXTS = new Set([
+    ".mp3", ".flac", ".m4a", ".ogg", ".wav", ".opus", ".m4b", ".aac",
+  ]);
+
+  try {
+    const files = await readdir(dirPath);
+    const audioFiles = files
+      .filter((f) => {
+        const dot = f.lastIndexOf(".");
+        if (dot === -1) return false;
+        return AUDIO_EXTS.has(f.slice(dot).toLowerCase());
+      })
+      .sort();
+
+    // .m3u is just a newline-separated list of relative filenames
+    const NL = "\n";
+    const m3uContent = audioFiles.join(NL) + (audioFiles.length ? NL : "");
+    await writeFile(m3uPath, m3uContent, "utf-8");
+    console.log(
+      `[m3u] Generated "${playlistName}.m3u" (${audioFiles.length} tracks)`,
     );
-  });
+  } catch (err) {
+    console.error(
+      `[m3u] Failed to generate .m3u for "${playlistName}":`,
+      err.message,
+    );
+  }
 }

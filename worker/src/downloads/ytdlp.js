@@ -24,6 +24,7 @@ import { ensureDir, sanitizeFolderName, generateM3u, sleep } from "../utils.js";
 
 const execFileAsync = promisify(execFile);
 const MUSIC_DIR = process.env.MUSIC_DIR || "/music";
+const YOUTUBE_COOKIES = process.env.YOUTUBE_COOKIES || null;
 
 /** Timeout per individual track download (5 minutes). */
 const TRACK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
@@ -74,6 +75,7 @@ async function downloadSingleTrack(videoUrl, outputDir, trackIndex, title) {
         "--embed-thumbnail",
         "--no-write-thumbnail",
         "-o", outputTemplate,
+        ...(YOUTUBE_COOKIES ? ["--cookies", YOUTUBE_COOKIES] : []),
         videoUrl,
       ],
       { timeout: TRACK_DOWNLOAD_TIMEOUT_MS },
@@ -148,6 +150,7 @@ export async function processYoutubeMusicJob(playlist, onProgress) {
       "--flat-playlist",
       "--dump-json",
       "--no-warnings",
+      ...(YOUTUBE_COOKIES ? ["--cookies", YOUTUBE_COOKIES] : []),
       url,
     ], { timeout: 120_000 });
 

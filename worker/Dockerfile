@@ -5,16 +5,27 @@
 
 FROM node:22-slim
 
-# Install Python 3, ffmpeg, and spotdl
+# Install Python 3, ffmpeg, spotdl, and curl (for deno install)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     ffmpeg \
+    curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # spotdl installs yt-dlp as a dependency, so we get both from one pip install.
 # --break-system-packages is needed on Debian Bookworm (PEP 668).
 RUN pip3 install --break-system-packages --no-cache-dir spotdl
+
+# Install deno — required by yt-dlp to execute JavaScript challenges
+# that YouTube serves for bot detection. Without a JS runtime, certain
+# videos fail with "No supported JavaScript runtime could be found".
+RUN curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o /tmp/deno.zip \
+    && unzip -o /tmp/deno.zip -d /usr/local/bin \
+    && chmod +x /usr/local/bin/deno \
+    && rm /tmp/deno.zip \
+    && deno --version
 
 WORKDIR /app
 

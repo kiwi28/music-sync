@@ -21,4 +21,13 @@ else
   echo "[entrypoint] SPOTIFY_CLIENT_ID/SPOTIFY_CLIENT_SECRET not set — Spotify sync needs OAuth setup in Settings"
 fi
 
+# Log cookie configuration
+if [ -n "$YOUTUBE_COOKIES" ] && [ -f "$YOUTUBE_COOKIES" ]; then
+  echo "[entrypoint] YouTube cookies configured: $YOUTUBE_COOKIES"
+elif [ -n "$YOUTUBE_COOKIES" ]; then
+  echo "[entrypoint] WARNING: YOUTUBE_COOKIES is set but file not found: $YOUTUBE_COOKIES"
+else
+  echo "[entrypoint] No YouTube cookies configured — age-restricted tracks will be skipped"
+fi
+
 exec node src/worker.js
