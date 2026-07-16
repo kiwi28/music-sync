@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: MS
+      - heading "Music Sync" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Cross-platform playlist synchronization
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Sign in" [level=3] [ref=e11]
+        - paragraph [ref=e12]: Sign in to manage your music library
+      - generic [ref=e13]:
+        - generic [ref=e14]:
+          - generic [ref=e15]:
+            - generic [ref=e16]: Email
+            - textbox "Email" [ref=e17]:
+              - /placeholder: you@example.com
+          - generic [ref=e18]:
+            - generic [ref=e19]: Password
+            - textbox "Password" [ref=e20]:
+              - /placeholder: ••••••••
+          - button "Sign in" [ref=e21]
+        - generic [ref=e22]:
+          - text: No account?
+          - button "Create one" [ref=e23]

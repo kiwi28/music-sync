@@ -1,0 +1,59 @@
+[    4426ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[    4517ms] [LOG] [HMR] connected @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[    4661ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[    4725ms] [LOG] [Fast Refresh] done in 172ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[    7863ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[   62004ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8090/api/collections/users/auth-with-password:0
+[   65005ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[   68003ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8090/api/collections/users/auth-with-password:0
+[   71014ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[   77404ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8090/api/collections/users/auth-with-password:0
+[   80415ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  126989ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8090/api/collections/users/auth-with-password:0
+[  129998ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  135384ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8090/api/collections/users/auth-with-password:0
+[  138391ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  171711ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8090/api/collections/users/auth-with-password:0
+[  174723ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  248527ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  248591ms] [LOG] [Fast Refresh] done in 169ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  248699ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  248913ms] [LOG] [Fast Refresh] done in 320ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  251934ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  279442ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  279505ms] [LOG] [Fast Refresh] done in 168ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  305466ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  305773ms] [LOG] [Fast Refresh] done in 142ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  308780ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  326385ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  326524ms] [LOG] [Fast Refresh] done in 244ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  331575ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  331638ms] [LOG] [Fast Refresh] done in 169ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  339449ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  339466ms] [LOG] [Fast Refresh] done in 123ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  344608ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  344863ms] [LOG] [Fast Refresh] done in 127ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  347916ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  359215ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  359218ms] Error: No link element found for chunk /_next/static/chunks/_1226l6j._.css
+    at http://localhost:3100/_next/static/chunks/turbopack-_01_ro95._.js:2169:28
+    at new Promise (<anonymous>)
+    at Object.reloadChunk (http://localhost:3100/_next/static/chunks/turbopack-_01_ro95._.js:2158:20)
+    at applyChunkListUpdate (http://localhost:3100/_next/static/chunks/turbopack-_01_ro95._.js:1748:46)
+    at applyUpdate (http://localhost:3100/_next/static/chunks/turbopack-_01_ro95._.js:1722:13)
+    at handleApply (http://localhost:3100/_next/static/chunks/turbopack-_01_ro95._.js:1785:17)
+    at triggerUpdate (http://localhost:3100/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_1mojsay._.js:456:9)
+    at applyAggregatedUpdates (http://localhost:3100/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_1mojsay._.js:98:9)
+    at http://localhost:3100/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_1mojsay._.js:32:21
+    at processTurbopackMessage (http://localhost:3100/_next/static/chunks/node_modules_next_dist_client_0r5nbpw._.js:13494:13)
+    at processMessage (http://localhost:3100/_next/static/chunks/node_modules_next_dist_client_0r5nbpw._.js:14061:17)
+    at WebSocket.handleMessage (http://localhost:3100/_next/static/chunks/node_modules_next_dist_client_0r5nbpw._.js:13458:52)
+[  359250ms] [LOG] [Fast Refresh] done in 101ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  362289ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  382327ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  382659ms] [LOG] [Fast Refresh] done in 182ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  385697ms] [WARNING] The resource http://localhost:3100/_next/static/chunks/_1226l6j._.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3100/files:0
+[  416222ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  416428ms] [LOG] [Fast Refresh] done in 307ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  425230ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477
+[  425231ms] [LOG] [Fast Refresh] done in 109ms @ http://localhost:3100/_next/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477

@@ -75,6 +75,12 @@ export const moveFileSchema = z.object({
   to: z.string().min(1, "Destination path is required"),
 });
 
+/** File browser: copy */
+export const copyFileSchema = z.object({
+  from: z.string().min(1, "Source path is required"),
+  to: z.string().min(1, "Destination path is required"),
+});
+
 /** File browser: M3U refresh */
 export const refreshM3uSchema = z.object({
   playlistId: z.string().optional(),
@@ -91,4 +97,5 @@ export type BrowseFilesInput = z.infer<typeof browseFilesSchema>;
 export type CreateFolderInput = z.infer<typeof createFolderSchema>;
 export type DeleteFileInput = z.infer<typeof deleteFileSchema>;
 export type MoveFileInput = z.infer<typeof moveFileSchema>;
+export type CopyFileInput = z.infer<typeof copyFileSchema>;
 export type RefreshM3uInput = z.infer<typeof refreshM3uSchema>;

@@ -1,8 +1,11 @@
 /* SVAR File Manager — theme overrides for Music Sync dark theme.
-   The WillowDark base provides structural styles; we override colors
+   The WillowDark base provides structural styles; we override colours
    to match the app's neutral-900 / white-opacity palette. */
 
 .wx-willow-dark-theme {
+  /* Theme identity */
+  --wx-theme-name: music-sync-dark;
+
   /* Background & surface */
   --wx-fm-background: #0a0a0a;
   --wx-background: rgba(255, 255, 255, 0.05);
@@ -16,11 +19,11 @@
   /* Text */
   --wx-color-font: #fafafa;
   --wx-color-font-alt: rgba(250, 250, 250, 0.5);
-  --wx-font-color: #fafafa;
 
-  /* Primary accent — use a muted white-blue instead of SVAR's default blue */
+  /* Primary accent — muted white instead of SVAR's default purple */
   --wx-color-primary: rgba(255, 255, 255, 0.85);
   --wx-color-primary-selected: rgba(255, 255, 255, 0.08);
+  --wx-color-primary-font: #0a0a0a;
 
   /* Icons */
   --wx-icon-color: rgba(250, 250, 250, 0.5);
@@ -30,10 +33,6 @@
   /* Toolbar */
   --wx-fm-toolbar-height: 56px;
 
-  /* Scrollbar */
-  --wx-scroll-bg: transparent;
-  --wx-scroll-thumb: rgba(255, 255, 255, 0.15);
-
   /* Box shadow — none for flat dark look */
   --wx-fm-box-shadow: none;
 
@@ -42,16 +41,20 @@
   --wx-font-weight-md: 500;
   --wx-line-height: 1.5;
   --wx-font-family: var(--font-geist-sans), system-ui, sans-serif;
+
+  /* Table header */
+  --wx-fm-grid-header-color: rgba(255, 255, 255, 0.04);
 }
 
-/* Remove the sidebar (tree) by default — the main file list is enough for our use case */
+/* Remove the sidebar (tree) — the flat file list is enough for our use case.
+   Using !important because SVAR manages visibility via inline style toggle. */
 .wx-filemanager .wx-sidebar {
-  display: none;
+  display: none !important;
 }
 
-/* Make the main content area full width */
+/* Make the main content area full width when sidebar is hidden */
 .wx-filemanager .wx-content-item {
-  width: 100%;
+  width: 100% !important;
 }
 
 /* Toolbar refinements */
@@ -59,12 +62,22 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* File row hover */
+/* File/row hover */
 .wx-filemanager .wx-row:hover {
   background-color: rgba(255, 255, 255, 0.04);
 }
 
-/* Button overrides */
+/* Button border-radius override */
 .wx-filemanager button {
   border-radius: 8px;
+}
+
+/* Breadcrumb refinements */
+.wx-breadcrumbs {
+  font-size: 14px;
+}
+
+/* Upload area background */
+.wx-upload-area {
+  background-color: var(--wx-fm-background);
 }

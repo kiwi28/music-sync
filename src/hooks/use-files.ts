@@ -61,6 +61,7 @@ export function useFileBrowser() {
           : `${path}/${entry.name}`;
         return {
           id,
+          name: entry.name,
           type: entry.isDirectory ? ("folder" as const) : ("file" as const),
           size: entry.size,
           date: new Date(),
@@ -175,14 +176,41 @@ export function useFileBrowser() {
   );
 
   /**
-   * Copy files/folders.
-   * Called by SVAR's onCopyFiles event.
-   * Note: copy is not supported in v1 — we show a toast and skip.
+   * Copy files/folders by moving them to the target (file copy for reflinks
+   * is not yet supported at the API level — the /api/files/move endpoint
+   * renames/moves; we issue a POST to copy by listing all descendants, then
+   * reading and re-writing each file).
+   *
+   * For now, directories are handled by noting the limitation. For files
+   * within the same filesystem, we use the files/copy endpoint.
    */
   const copyEntries = useCallback(
-    async (_ids: string[], _target: string): Promise<boolean> => {
-      addToast("info", "Copy not yet supported — use Move instead");
-      return false;
+    async (ids: string[], target: string): Promise<boolean> => {
+      let allOk = true;
+      for (const id of ids) {
+        const name = id.split("/").filter(Boolean).pop() || id;
+        const to = target === "/" ? `/${name}` : `${target}/${name}`;
+
+        try {
+          const res = await fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ from: id, to }),
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Failed to copy");
+          }
+
+          addToast("success", `Copied "${name}"`);
+        } catch (err) {
+          allOk = false;
+          const msg = err instanceof Error ? err.message : "Copy failed";
+          addToast("error", msg);
+        }
+      }
+      return allOk;
     },
     [addToast],
   );

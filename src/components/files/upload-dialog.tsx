@@ -27,7 +27,7 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { playlists } = usePlaylists();
+  const { playlists, loading: playlistsLoading } = usePlaylists();
 
   const handleFiles = useCallback((newFiles: FileList | null) => {
     if (!newFiles) return;
@@ -38,11 +38,14 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    handleFiles(e.dataTransfer.files);
-  }, [handleFiles]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      handleFiles(e.dataTransfer.files);
+    },
+    [handleFiles],
+  );
 
   const handleSubmit = async () => {
     if (files.length === 0) return;
@@ -73,6 +76,9 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
     >
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
         {/* Header */}
@@ -81,6 +87,7 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
@@ -139,6 +146,7 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
                     removeFile(i);
                   }}
                   className="flex-shrink-0 rounded p-0.5 text-white/30 hover:bg-white/10 hover:text-white/70"
+                  aria-label={`Remove ${file.name}`}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -171,23 +179,37 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
           </div>
 
           {destination === "existing" ? (
-            <Select
-              label=""
-              value={selectedPlaylistId}
-              onChange={(e) => setSelectedPlaylistId(e.target.value)}
-              disabled={playlists.length === 0}
-              options={[
-                { value: "", label: "Select a playlist…" },
-                ...playlists.map((p: Playlist) => ({
-                  value: p.id,
-                  label: `${p.name} (${p.platform})`,
-                })),
-              ]}
-            />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-white/70">
+                Playlist
+              </label>
+              {playlistsLoading ? (
+                <div className="h-10 rounded-lg border border-white/10 bg-white/5 px-3 flex items-center">
+                  <div className="h-3 w-3 animate-spin rounded-full border border-white/20 border-t-white/60" />
+                  <span className="ml-2 text-xs text-white/40">Loading playlists…</span>
+                </div>
+              ) : playlists.length === 0 ? (
+                <p className="text-xs text-white/30">
+                  No playlists yet — create one with &ldquo;New Playlist&rdquo;
+                </p>
+              ) : (
+                <Select
+                  value={selectedPlaylistId}
+                  onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                  options={[
+                    { value: "", label: "Select a playlist…" },
+                    ...playlists.map((p: Playlist) => ({
+                      value: p.id,
+                      label: `${p.name} (${p.platform})`,
+                    })),
+                  ]}
+                />
+              )}
+            </div>
           ) : (
             <Input
               type="text"
-              label=""
+              label="Playlist name"
               placeholder="New playlist name…"
               value={newPlaylistName}
               onChange={(e) => setNewPlaylistName(e.target.value)}

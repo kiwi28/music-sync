@@ -1,6 +1,6 @@
 "server-only";
 
-import { mkdir, readdir, rm, rename, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, rename, stat, writeFile } from "node:fs/promises";
 import { join, resolve, sep, relative, parse } from "node:path";
 
 // ── Constants ──────────────────────────────────────────
@@ -146,12 +146,30 @@ export async function movePath(from: string, to: string): Promise<void> {
   if (!safeFrom || !safeTo) {
     throw new Error("Path is outside the music directory");
   }
-  // Ensure the destination parent directory exists
-  const parent = to.slice(0, to.lastIndexOf(sep));
+  // Ensure the destination parent directory exists (use safeTo, not raw "to")
+  const parent = safeTo.slice(0, safeTo.lastIndexOf(sep));
   if (parent) {
     await mkdir(parent, { recursive: true });
   }
   await rename(safeFrom, safeTo);
+}
+
+/**
+ * Copy a file or folder (recursively).
+ * `from` and `to` are both validated to be under MUSIC_ROOT.
+ */
+export async function copyPath(from: string, to: string): Promise<void> {
+  const safeFrom = validatePath(from);
+  const safeTo = validatePath(to);
+  if (!safeFrom || !safeTo) {
+    throw new Error("Path is outside the music directory");
+  }
+  // Ensure the destination parent directory exists
+  const parent = safeTo.slice(0, safeTo.lastIndexOf(sep));
+  if (parent) {
+    await mkdir(parent, { recursive: true });
+  }
+  await cp(safeFrom, safeTo, { recursive: true });
 }
 
 // ── M3U Generation ─────────────────────────────────────
