@@ -62,6 +62,7 @@ export interface SyncJob {
   completed_at?: string;
   tracks_added?: number;
   tracks_removed?: number;
+  failed_count?: number;
   error?: string;
   log?: string;
   /** Populated on expand */

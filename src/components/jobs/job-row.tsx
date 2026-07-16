@@ -71,6 +71,14 @@ export function JobRow({
           {status.label}
         </Badge>
 
+        {/* Failed tracks warning */}
+        {job.status === "completed" && (job.failed_count ?? 0) > 0 && (
+          <Badge variant="danger">
+            <span className="mr-1">⚠</span>
+            {job.failed_count} failed
+          </Badge>
+        )}
+
         {/* Playlist name */}
         <Link
           href={`/playlists/${job.playlist}`}
