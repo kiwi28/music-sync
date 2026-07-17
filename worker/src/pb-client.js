@@ -15,11 +15,40 @@ let pb = null;
 
 /**
  * Return an authenticated PocketBase admin client.
- * Re-authenticates if the existing session is expired.
+ * Re-authenticates if the existing session is expired or has become invalid
+ * (e.g. because PocketBase restarted and regenerated its JWT signing key).
+ *
+ * The SDK's authStore.isValid only checks JWT expiry — it does not verify that
+ * the token's signature is still accepted by the server. When PocketBase
+ * restarts without a fixed PB_ENCRYPTION_KEY, it generates a new signing key,
+ * silently invalidating all existing admin tokens. We detect this by making a
+ * lightweight probe request before returning the cached client.
  */
 export async function getAdminClient() {
   if (pb && pb.authStore.isValid) {
-    return pb;
+    // Verify the token is still accepted by the server — isValid() only
+    // checks expiry, not signature validity. If PocketBase restarted without
+    // a fixed PB_ENCRYPTION_KEY, the JWT signing key changed and our cached
+    // token is cryptographically invalid.
+    try {
+      await pb.admins.authRefresh();
+      return pb;
+    } catch (err) {
+      // Distinguish between network errors (PocketBase not ready) and actual
+      // auth failures (token rejected after server restart with new key).
+      if (err?.status === 401) {
+        console.log(
+          "[pb-client] Cached token rejected (401) — re-authenticating...",
+        );
+      } else {
+        console.log(
+          "[pb-client] Token probe failed (status %d, may be network) — re-authenticating...",
+          err?.status || 0,
+        );
+      }
+      pb.authStore.clear();
+      pb = null;
+    }
   }
 
   pb = new PocketBase(PB_URL);

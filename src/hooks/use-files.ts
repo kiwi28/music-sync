@@ -281,13 +281,14 @@ export function useFileBrowser() {
 
   /**
    * Upload files to a playlist.
-   * Called from our custom UploadDialog, not from SVAR directly.
+   * Uses XMLHttpRequest instead of fetch to get upload progress events.
    */
   const uploadToPlaylist = useCallback(
     async (
       files: File[],
       playlistId: string | null,
       newPlaylistName: string | null,
+      onProgress?: (percent: number) => void,
     ): Promise<boolean> => {
       try {
         const formData = new FormData();
@@ -297,18 +298,44 @@ export function useFileBrowser() {
         if (playlistId) formData.append("playlistId", playlistId);
         if (newPlaylistName) formData.append("newPlaylistName", newPlaylistName);
 
-        const res = await fetch("/api/files/upload", {
-          method: "POST",
-          body: formData,
-        });
+        // XMLHttpRequest gives us upload progress — fetch doesn't.
+        const result = await new Promise<{ tracksAdded: number }>(
+          (resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/api/files/upload");
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Upload failed");
-        }
+            xhr.upload.addEventListener("progress", (ev) => {
+              if (ev.lengthComputable && onProgress) {
+                const pct = Math.round((ev.loaded / ev.total) * 100);
+                onProgress(pct);
+              }
+            });
 
-        const { tracksAdded } = await res.json();
-        addToast("success", `Uploaded ${tracksAdded} track(s)`);
+            xhr.addEventListener("load", () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(JSON.parse(xhr.responseText));
+              } else {
+                try {
+                  const data = JSON.parse(xhr.responseText);
+                  reject(new Error(data.error || `Upload failed (${xhr.status})`));
+                } catch {
+                  reject(new Error(`Upload failed (${xhr.status})`));
+                }
+              }
+            });
+
+            xhr.addEventListener("error", () =>
+              reject(new Error("Network error during upload")),
+            );
+            xhr.addEventListener("abort", () =>
+              reject(new Error("Upload cancelled")),
+            );
+
+            xhr.send(formData);
+          },
+        );
+
+        addToast("success", `Uploaded ${result.tracksAdded} track(s)`);
         return true;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Upload failed";

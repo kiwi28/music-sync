@@ -12,6 +12,7 @@ services:
     environment:
       - PB_SUPERUSER_EMAIL=${PB_SUPERUSER_EMAIL:-admin@musicsync.local}
       - PB_SUPERUSER_PASSWORD=${PB_SUPERUSER_PASSWORD:-change-me}
+      - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
     restart: unless-stopped
 
   # ── Background worker (spotdl / yt-dlp) ──

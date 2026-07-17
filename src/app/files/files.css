@@ -1,6 +1,148 @@
-/* SVAR File Manager — theme overrides for Music Sync dark theme.
+/* ═══════════════════════════════════════════════════════════════════════════
+   SVAR File Manager — theme overrides for Music Sync dark theme.
+
    The WillowDark base provides structural styles; we override colours
-   to match the app's neutral-900 / white-opacity palette. */
+   to match the app's neutral-900 / white-opacity palette.
+
+   IMPORTANT: SVAR renders popups, dropdowns, and context menus via React
+   portals to document.body.  Those elements live OUTSIDE the themed
+   wrapper, so CSS custom properties set on .wx-willow-dark-theme alone
+   won't reach them.  We apply theme variables at the html/body level
+   and target portalled elements directly.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Theme variables at document level (reach portalled popups) ── */
+
+html {
+  /* Popup / dropdown / context menu */
+  --wx-popup-z-index: 60;
+  --wx-popup-background: #1c1c1c;
+  --wx-popup-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --wx-popup-border: 1px solid rgba(255, 255, 255, 0.1);
+  --wx-popup-border-radius: 10px;
+
+  /* Modal (rename dialog etc.) */
+  --wx-modal-background: #1c1c1c;
+  --wx-modal-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --wx-modal-border: 1px solid rgba(255, 255, 255, 0.1);
+  --wx-modal-border-radius: 10px;
+  --wx-modal-header-font-color: #fafafa;
+
+  /* General theme identity */
+  --wx-theme-name: music-sync-dark;
+  --wx-fm-background: #0a0a0a;
+  --wx-background: rgba(255, 255, 255, 0.05);
+  --wx-background-alt: rgba(255, 255, 255, 0.08);
+  --wx-fm-select-background: rgba(255, 255, 255, 0.1);
+
+  /* Borders */
+  --wx-border: 1px solid rgba(255, 255, 255, 0.1);
+  --wx-fm-grid-border: 1px solid rgba(255, 255, 255, 0.06);
+
+  /* Text */
+  --wx-color-font: #fafafa;
+  --wx-color-font-alt: rgba(250, 250, 250, 0.5);
+
+  /* Primary accent */
+  --wx-color-primary: rgba(255, 255, 255, 0.85);
+  --wx-color-primary-selected: rgba(255, 255, 255, 0.08);
+  --wx-color-primary-font: #0a0a0a;
+
+  /* Buttons */
+  --wx-button-background: rgba(255, 255, 255, 0.08);
+  --wx-button-font-color: rgba(250, 250, 250, 0.7);
+  --wx-button-border: none;
+  --wx-button-border-radius: 6px;
+  --wx-button-padding: 4px 10px;
+  --wx-button-height: 34px;
+  --wx-button-font-size: 13px;
+  --wx-button-font-weight: 500;
+
+  /* Toolbar & mode selector */
+  --wx-fm-button-font-color: rgba(250, 250, 250, 0.6);
+  --wx-fm-toolbar-height: 56px;
+  --wx-segmented-background: rgba(255, 255, 255, 0.06);
+  --wx-segmented-background-hover: rgba(255, 255, 255, 0.1);
+  --wx-segmented-border: none;
+  --wx-segmented-border-radius: 8px;
+  --wx-segmented-padding: 2px;
+
+  /* Table selection */
+  --wx-table-select-background: rgba(255, 255, 255, 0.1);
+  --wx-table-select-border: rgba(255, 255, 255, 0.15);
+  --wx-table-select-color: rgba(250, 250, 250, 0.9);
+  --wx-table-header-background: rgba(255, 255, 255, 0.04);
+
+  /* Icons */
+  --wx-icon-color: rgba(250, 250, 250, 0.5);
+  --wx-icon-size: 22px;
+
+  /* Misc */
+  --wx-fm-box-shadow: none;
+  --wx-font-size: 14px;
+  --wx-font-weight-md: 500;
+  --wx-line-height: 1.5;
+  --wx-font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ── Popup / dropdown / context-menu (rendered to body via portal) ── */
+
+/*
+ * SVAR renders context menus, dropdowns, and popups as React portals to
+ * document.body.  They live OUTSIDE the themed wrapper, so we must target
+ * them globally.  We use !important defensively because some SVAR versions
+ * set background inline or via high-specificity selectors.
+ *
+ * Classes covered:
+ *   .wx-popup      — generic popup (context menu, picker, tooltip-like)
+ *   .wx-dropdown   — dropdown / select-menu
+ *   .wx-menu       — menu body (used inside popups)
+ *   .wx-list       — list container inside menus
+ *   .wx-list-item  — individual clickable menu rows
+ */
+
+/* Force opaque dark background on every portalled overlay */
+.wx-popup,
+.wx-dropdown,
+.wx-contextmenu,
+.wx-menu {
+  background-color: #1c1c1c !important;
+  color: #fafafa !important;
+}
+
+/* Some SVAR versions use a semi-transparent overlay behind popups —
+   make sure it's actually visible */
+.wx-popup .wx-body,
+.wx-popup .wx-content,
+.wx-dropdown .wx-body,
+.wx-dropdown .wx-content,
+.wx-menu .wx-body,
+.wx-menu .wx-content {
+  background-color: #1c1c1c !important;
+  color: #fafafa;
+}
+
+/* Menu item rows — readable text on dark background */
+.wx-popup .wx-menu-item,
+.wx-popup .wx-list-item,
+.wx-dropdown .wx-menu-item,
+.wx-dropdown .wx-list-item,
+.wx-menu .wx-menu-item,
+.wx-menu .wx-list-item,
+.wx-contextmenu .wx-list-item {
+  color: #fafafa;
+}
+
+/* Hover highlight for menu items */
+.wx-popup .wx-menu-item:hover,
+.wx-popup .wx-list-item:hover,
+.wx-dropdown .wx-menu-item:hover,
+.wx-dropdown .wx-list-item:hover,
+.wx-menu .wx-menu-item:hover,
+.wx-menu .wx-list-item:hover,
+.wx-contextmenu .wx-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
 
 /* ── Layout fixes ──────────────────────────────────── */
 
@@ -16,7 +158,7 @@
   flex-direction: column;
 }
 
-/* ── Theme overrides ───────────────────────────────── */
+/* ── Theme overrides (scoped to the file-manager area) ── */
 
 .wx-willow-dark-theme {
   /* Theme identity */
@@ -67,10 +209,17 @@
   --wx-popup-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
   --wx-popup-z-index: 60;
 
+  /* ── Modal dialogs ── */
+  --wx-modal-background: #1c1c1c;
+  --wx-modal-border: 1px solid rgba(255, 255, 255, 0.1);
+  --wx-modal-border-radius: 10px;
+  --wx-modal-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+
   /* ── Table selection ── */
   --wx-table-select-background: rgba(255, 255, 255, 0.1);
   --wx-table-select-border: rgba(255, 255, 255, 0.15);
   --wx-table-select-color: rgba(250, 250, 250, 0.9);
+  --wx-table-header-background: rgba(255, 255, 255, 0.04);
 
   /* ── Icons ── */
   --wx-icon-color: rgba(250, 250, 250, 0.5);
@@ -89,6 +238,8 @@
   --wx-fm-grid-header-color: rgba(255, 255, 255, 0.04);
 }
 
+/* ── Sidebar (tree) — hidden ───────────────────────── */
+
 /* Remove the sidebar (tree) — the flat file list is enough for our use case.
    Using !important because SVAR manages visibility via inline style toggle. */
 .wx-filemanager .wx-sidebar {
@@ -100,27 +251,108 @@
   width: 100% !important;
 }
 
-/* Toolbar refinements */
+/* ── Toolbar ────────────────────────────────────────── */
+
 .wx-filemanager .wx-toolbar {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* File/row hover */
+/* Toolbar mode-segmented buttons — ensure visible text */
+.wx-toolbar .wx-modes .wx-segmented .wx-button {
+  color: rgba(250, 250, 250, 0.7);
+}
+
+.wx-toolbar .wx-modes .wx-segmented .wx-button.wx-active {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #fafafa;
+}
+
+/* Toolbar icon buttons (sidebar toggle, preview toggle) */
+.wx-toolbar .wx-preview-icon {
+  color: rgba(250, 250, 250, 0.5);
+}
+
+.wx-toolbar .wx-preview-icon:hover {
+  color: rgba(250, 250, 250, 0.8);
+}
+
+/* ── Table rows — interaction fixes ────────────────── */
+
+/* Make table rows feel clickable */
+.wx-table-box .wx-body .wx-row {
+  cursor: pointer;
+}
+
+/* Individual cells inherit the pointer cursor */
+.wx-table-box .wx-body .wx-cell {
+  cursor: pointer;
+}
+
+/* Row hover highlight */
+.wx-table-box .wx-body .wx-row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Selected row */
+.wx-table-box .wx-body .wx-row.wx-selected {
+  background-color: var(--wx-fm-select-background);
+}
+
+/* Name cell — allow click on full area, not just text */
+.wx-name-cell {
+  cursor: pointer;
+}
+
+/* File name text inside cells */
+.wx-table-box .wx-body .wx-name-cell .wx-name {
+  cursor: pointer;
+}
+
+/* ── General row / file hover ──────────────────────── */
+
 .wx-filemanager .wx-row:hover {
   background-color: rgba(255, 255, 255, 0.04);
 }
 
-/* Button border-radius override */
+/* ── File/folder list items ────────────────────────── */
+
+/* Cards mode item hover */
+.wx-item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Button border-radius override ─────────────────── */
+
 .wx-filemanager button {
   border-radius: 8px;
 }
 
-/* Breadcrumb refinements */
+/* ── Breadcrumb ────────────────────────────────────── */
+
 .wx-breadcrumbs {
   font-size: 14px;
 }
 
-/* Upload area background */
+/* Breadcrumb items */
+.wx-breadcrumbs .wx-item {
+  cursor: pointer;
+}
+
+/* ── Upload area ───────────────────────────────────── */
+
 .wx-upload-area {
   background-color: var(--wx-fm-background);
+}
+
+/* ── Context menu items in the file manager ────────── */
+
+/* Style menu items when shown inside the file explorer area */
+.wx-filemanager .wx-popup .wx-list-item,
+.wx-filemanager .wx-dropdown .wx-list-item {
+  color: #fafafa;
+}
+
+.wx-filemanager .wx-popup .wx-list-item:hover,
+.wx-filemanager .wx-dropdown .wx-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }

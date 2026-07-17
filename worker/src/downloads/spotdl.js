@@ -498,7 +498,7 @@ export async function processSpotifyJob(playlist, onProgress) {
 
     return {
       tracksAdded,
-      totalTracks: trackList.length,
+      totalTracks: totalSynced,
       failedTracks,
     };
   }

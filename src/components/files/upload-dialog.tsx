@@ -15,6 +15,7 @@ interface UploadDialogProps {
     files: File[],
     playlistId: string | null,
     newPlaylistName: string | null,
+    onProgress: (percent: number) => void,
   ) => Promise<boolean>;
 }
 
@@ -24,6 +25,7 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,10 +55,12 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
     if (destination === "new" && !newPlaylistName.trim()) return;
 
     setUploading(true);
+    setProgress(0);
     const success = await onUpload(
       files,
       destination === "existing" ? selectedPlaylistId : null,
       destination === "new" ? newPlaylistName.trim() : null,
+      setProgress,
     );
     setUploading(false);
 
@@ -217,6 +221,31 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
             />
           )}
         </div>
+
+        {/* Upload progress */}
+        {uploading && (
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-white/70">Uploading {files.length} file(s)…</span>
+              <span className="font-medium tabular-nums text-white/90">
+                {progress}%
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-white/60 transition-[width] duration-150 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            {/* Per-file size summary */}
+            <p className="text-xs text-white/30">
+              {files.length} file(s) —{" "}
+              {(files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(1)}{" "}
+              MB total
+            </p>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex justify-end gap-2">

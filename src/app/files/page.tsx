@@ -8,6 +8,7 @@ import "./files.css";
 
 import { useFileBrowser } from "@/hooks/use-files";
 import { UploadDialog } from "@/components/files/upload-dialog";
+import { fileIconProvider } from "@/components/files/file-icons";
 import { RefreshCw, Upload, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 
@@ -203,8 +204,9 @@ export default function FilesPage() {
       files: File[],
       playlistId: string | null,
       newPlaylistName: string | null,
+      onProgress: (percent: number) => void,
     ) => {
-      return uploadToPlaylist(files, playlistId, newPlaylistName);
+      return uploadToPlaylist(files, playlistId, newPlaylistName, onProgress);
     },
     [uploadToPlaylist],
   );
@@ -271,12 +273,13 @@ export default function FilesPage() {
             </div>
           </div>
         ) : (
-          <WillowDark>
+          <WillowDark fonts={true}>
             <Filemanager
               data={initialData}
               init={init}
               mode="table"
               preview={false}
+              icons={fileIconProvider}
               onRequestData={handleRequestData}
               onCreateFile={handleCreateFile}
               onDeleteFiles={handleDeleteFiles}

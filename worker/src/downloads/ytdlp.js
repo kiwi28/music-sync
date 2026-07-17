@@ -348,7 +348,7 @@ export async function processYoutubeMusicJob(playlist, onProgress) {
 
   return {
     tracksAdded,
-    totalTracks: trackList.length,
+    totalTracks: totalSynced,
     failedTracks,
   };
 }

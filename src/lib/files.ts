@@ -19,23 +19,38 @@ const AUDIO_EXTS = new Set([
  * Validate that `userPath` resolves underneath `MUSIC_ROOT`.
  * Returns the resolved absolute path on success, or `null` if the
  * path would escape the music root (path-traversal attempt).
+ *
+ * Handles two input styles:
+ * 1. SVAR-style paths with a leading slash (e.g. `/spotify/MyPlaylist`)
+ *    — treated as relative to MUSIC_ROOT via `join`.
+ * 2. Already-resolved absolute paths (e.g. `/music/spotify/MyPlaylist`)
+ *    — detected by `resolve` and used directly when under MUSIC_ROOT.
  */
 export function validatePath(userPath: string): string | null {
-  // Resolve relative to MUSIC_ROOT so "../" tricks don't escape.
-  const resolved = resolve(MUSIC_ROOT, userPath);
-
-  // Normalise separators for reliable prefix check on Windows.
   const normalisedRoot = MUSIC_ROOT.endsWith(sep)
     ? MUSIC_ROOT
     : MUSIC_ROOT + sep;
-  const normalisedResolved = resolved.endsWith(sep)
-    ? resolved
-    : resolved + sep;
 
-  if (!normalisedResolved.startsWith(normalisedRoot)) {
-    return null;
-  }
-  return resolved;
+  /** Check whether a candidate absolute path is safely inside MUSIC_ROOT. */
+  const check = (candidate: string): string | null => {
+    const normalised = candidate.endsWith(sep) ? candidate : candidate + sep;
+    return normalised.startsWith(normalisedRoot) ? candidate : null;
+  };
+
+  // Strategy 1 — direct resolve.
+  // Handles already-resolved absolute paths (e.g. /music/spotify/…)
+  // and bare relative paths (e.g. spotify/Playlist, ../../etc/passwd).
+  const byResolve = resolve(userPath);
+  const result = check(byResolve);
+  if (result) return result;
+
+  // Strategy 2 — join relative to MUSIC_ROOT.
+  // Handles SVAR-style paths with a leading slash (e.g. /spotify/…).
+  // `resolve` treats a leading slash as an absolute path outside
+  // MUSIC_ROOT; `join` treats every segment as relative.
+  const relativePath = userPath.replace(/^\/+/, "");
+  const byJoin = join(MUSIC_ROOT, relativePath);
+  return check(byJoin);
 }
 
 /**

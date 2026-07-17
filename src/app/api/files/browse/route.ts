@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { browseFilesSchema } from "@/lib/validators";
-import { listDirectory, MUSIC_ROOT } from "@/lib/files";
+import { listDirectory } from "@/lib/files";
 import { logApiError, apiErrorResponse } from "@/lib/api-errors";
-import { join } from "node:path";
 
 /**
  * GET /api/files/browse?path=/spotify/My%20Playlist
@@ -31,10 +30,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build the absolute path — listDirectory handles validation internally
-    const dirPath = rawPath === "/" ? MUSIC_ROOT : join(MUSIC_ROOT, rawPath);
-
-    const entries = await listDirectory(dirPath);
+    // Pass the raw path to listDirectory — it calls validatePath internally which
+    // resolves relative to MUSIC_ROOT.  We must NOT pre-join with MUSIC_ROOT here
+    // or the path gets double-joined (→ /music/music/…).
+    const entries = await listDirectory(rawPath);
 
     // Return paths relative to MUSIC_ROOT for the client
     const relativeEntries = entries.map((e) => ({

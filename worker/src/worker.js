@@ -257,6 +257,12 @@ async function main() {
 
   while (true) {
     try {
+      // Re-verify admin auth before each poll cycle. On cache hit this
+      // is a single authRefresh() call (~5ms). If the token was silently
+      // invalidated (e.g. PocketBase restarted without PB_ENCRYPTION_KEY),
+      // getAdminClient re-authenticates transparently.
+      pb = await getAdminClient();
+
       // NOTE: expand/sort on sync_jobs is broken in PB 0.28.x — returns 400.
       // The playlist is fetched separately in processJob() instead of expand,
       // and we omit sort to avoid the 400 bug (sort references `created`).
