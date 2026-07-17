@@ -5,6 +5,7 @@ import type { SyncJob } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PLATFORM_META, timeAgo } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 import Link from "next/link";
 import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -39,6 +40,7 @@ export function JobRow({
 }: JobRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   const status = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.failed;
   const playlistName = job.expand?.playlist?.name ?? "Unknown playlist";
@@ -50,7 +52,9 @@ export function JobRow({
     try {
       await fn();
     } catch (err) {
-      console.error(`[JobRow] ${action} failed:`, err);
+      const msg =
+        err instanceof Error ? err.message : `${action} failed`;
+      addToast("error", msg);
     } finally {
       setActionLoading(null);
     }

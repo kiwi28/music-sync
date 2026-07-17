@@ -24,9 +24,11 @@ export function escapeFilter(value) {
 /**
  * Create a directory (and all intermediate directories) if it doesn't exist.
  * No-op if the directory already exists.
+ * Uses mode 0o777 so directories are writable by the Next.js app container
+ * (which runs as a different uid on the shared /music volume).
  */
 export async function ensureDir(dirPath) {
-  return mkdir(dirPath, { recursive: true });
+  return mkdir(dirPath, { recursive: true, mode: 0o777 });
 }
 
 /**
@@ -75,7 +77,8 @@ export async function generateM3u(dirPath, playlistName) {
     // .m3u is just a newline-separated list of relative filenames
     const NL = "\n";
     const m3uContent = audioFiles.join(NL) + (audioFiles.length ? NL : "");
-    await writeFile(m3uPath, m3uContent, "utf-8");
+    // mode 0o666 so the Next.js app container can overwrite this file later
+    await writeFile(m3uPath, m3uContent, { encoding: "utf-8", mode: 0o666 });
     console.log(
       `[m3u] Generated "${playlistName}.m3u" (${audioFiles.length} tracks)`,
     );

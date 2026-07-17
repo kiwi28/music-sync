@@ -66,13 +66,6 @@ export async function POST(request: NextRequest) {
 
     const trackCount = await generateM3u(dirPath, playlistName);
 
-    if (trackCount < 0) {
-      return NextResponse.json(
-        { error: "Failed to generate M3U file" },
-        { status: 500 },
-      );
-    }
-
     return NextResponse.json({ success: true, trackCount });
   } catch (err) {
     logApiError({ route: "files/m3u", step: "POST" }, err);

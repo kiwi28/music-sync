@@ -20,6 +20,7 @@ services:
       context: .
       dockerfile: worker/Dockerfile
     container_name: musicsync-worker
+    user: "1001:1001"
     volumes:
       - music:/music
       - spotdl_config:/home/node/.spotdl

@@ -5,6 +5,7 @@ import { useJobs, cancelJob, deleteJob, retryJob } from "@/hooks/use-jobs";
 import { JobRow, JobRowSkeleton } from "@/components/jobs/job-row";
 import { WorkerStatusBar } from "@/components/jobs/worker-status-bar";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const STATUS_TABS = [
@@ -25,6 +26,7 @@ function JobsContent() {
   const highlightId = searchParams.get("highlight");
   const playlistId = searchParams.get("playlistId");
 
+  const { addToast } = useToast();
   const { items, totalItems, totalPages, loading, error, refetch } = useJobs({
     status: statusFilter || undefined,
     playlistId: playlistId || undefined,
@@ -38,10 +40,12 @@ function JobsContent() {
         await fn();
         refetch();
       } catch (err) {
-        console.error(`[JobsPage] ${action} failed:`, err);
+        const msg =
+          err instanceof Error ? err.message : `${action} failed`;
+        addToast("error", msg);
       }
     },
-    [refetch],
+    [refetch, addToast],
   );
 
   return (

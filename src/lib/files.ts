@@ -1,6 +1,6 @@
 "server-only";
 
-import { cp, mkdir, readdir, rm, rename, stat, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readdir, rm, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { join, resolve, sep, relative, parse } from "node:path";
 
 // ── Constants ──────────────────────────────────────────
@@ -178,7 +178,8 @@ export async function copyPath(from: string, to: string): Promise<void> {
  * Generate an `.m3u` playlist file listing all audio files in a directory.
  * Mirrors `generateM3u()` in `worker/src/utils.js`.
  *
- * Returns the number of audio tracks written, or -1 on error.
+ * Returns the number of audio tracks written.
+ * Throws with a descriptive message on failure so the API can relay it to the client.
  */
 export async function generateM3u(
   dirPath: string,
@@ -189,26 +190,46 @@ export async function generateM3u(
     throw new Error("Path is outside the music directory");
   }
 
+  // Fail early with a clear message if the directory doesn't exist yet.
+  try {
+    await access(safePath);
+  } catch {
+    throw new Error(
+      "Playlist directory not found. Sync the playlist first to create it.",
+    );
+  }
+
   const safeName = sanitizeFolderName(playlistName);
   const m3uPath = join(safePath, `${safeName}.m3u`);
 
+  // Remove the existing .m3u first so we can replace a file that was
+  // created by a different uid (e.g. older worker running as root).
+  // Unlinking only needs write permission on the *directory*, not the file.
   try {
-    const entries = await listDirectory(safePath);
-    const audioFiles = entries
-      .filter((e) => !e.isDirectory && e.ext && AUDIO_EXTS.has(e.ext))
-      .map((e) => e.name)
-      .sort();
-
-    const NL = "\n";
-    const content = audioFiles.join(NL) + (audioFiles.length ? NL : "");
-    await writeFile(m3uPath, content, "utf-8");
-
-    return audioFiles.length;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[m3u] Failed to generate .m3u for "${playlistName}":`, msg);
-    return -1;
+    await unlink(m3uPath);
+  } catch (e) {
+    // If we can't even unlink, the directory itself has a permission problem —
+    // surface it now with an actionable message instead of failing later.
+    if (e instanceof Error && (e as NodeJS.ErrnoException).code === "EACCES") {
+      throw new Error(
+        "Permission denied — the playlist directory is owned by another user. " +
+        "Run: docker compose exec worker chown -R 1001:1001 /music",
+      );
+    }
+    // ENOENT (file doesn't exist yet) or any other error — fine, proceed.
   }
+
+  const entries = await listDirectory(safePath);
+  const audioFiles = entries
+    .filter((e) => !e.isDirectory && e.ext && AUDIO_EXTS.has(e.ext))
+    .map((e) => e.name)
+    .sort();
+
+  const NL = "\n";
+  const content = audioFiles.join(NL) + (audioFiles.length ? NL : "");
+  await writeFile(m3uPath, content, "utf-8");
+
+  return audioFiles.length;
 }
 
 // ── Helpers ────────────────────────────────────────────

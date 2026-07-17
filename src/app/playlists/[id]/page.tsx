@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePlaylist, useActiveSyncJob } from "@/hooks/use-playlists";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLATFORM_META, timeAgo } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 import { RefreshCw } from "lucide-react";
 
 export default function PlaylistDetailPage({
@@ -27,11 +28,15 @@ export default function PlaylistDetailPage({
     refetch: refetchSyncStatus,
   } = useActiveSyncJob(playlist?.id);
 
+  const { addToast } = useToast();
+  const [refreshingM3u, setRefreshingM3u] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
   const tracks = playlist?.expand?.playlist_tracks_via_playlist ?? [];
   const meta = playlist ? PLATFORM_META[playlist.platform] : null;
 
   async function handleSync() {
-    if (!playlist || !user) return;
+    if (!playlist || !user || syncing) return;
 
     // If a job is already active, just refresh the status — don't POST
     if (activeJob) {
@@ -39,6 +44,7 @@ export default function PlaylistDetailPage({
       return;
     }
 
+    setSyncing(true);
     try {
       const res = await fetch("/api/sync", {
         method: "POST",
@@ -63,13 +69,18 @@ export default function PlaylistDetailPage({
       refetchSyncStatus();
       router.refresh();
       fetchPlaylist();
+      addToast("success", "Sync queued — worker will start shortly");
     } catch (err) {
-      console.error("[handleSync]", err);
+      const msg = err instanceof Error ? err.message : "Sync failed";
+      addToast("error", msg);
+    } finally {
+      setSyncing(false);
     }
   }
 
   async function handleRefreshM3u() {
-    if (!playlist) return;
+    if (!playlist || refreshingM3u) return;
+    setRefreshingM3u(true);
     try {
       const res = await fetch("/api/files/m3u", {
         method: "POST",
@@ -83,10 +94,12 @@ export default function PlaylistDetailPage({
       }
 
       const { trackCount } = await res.json();
-      // Use a simple alert for now — toast would require the ToastProvider context
-      console.log(`[m3u] Refreshed "${playlist.name}".m3u (${trackCount} tracks)`);
+      addToast("success", `M3U refreshed (${trackCount} tracks)`);
     } catch (err) {
-      console.error("[handleRefreshM3u]", err);
+      const msg = err instanceof Error ? err.message : "M3U refresh failed";
+      addToast("error", msg);
+    } finally {
+      setRefreshingM3u(false);
     }
   }
 
@@ -201,8 +214,8 @@ export default function PlaylistDetailPage({
               Sync queued…
             </Button>
           ) : (
-            <Button onClick={handleSync} disabled={syncStatusLoading}>
-              Sync Now
+            <Button onClick={handleSync} disabled={syncStatusLoading || syncing}>
+              {syncing ? "Syncing…" : "Sync Now"}
             </Button>
           )}
 
@@ -238,11 +251,12 @@ export default function PlaylistDetailPage({
           <div className="flex items-center gap-3">
             <button
               onClick={handleRefreshM3u}
-              className="inline-flex items-center gap-1 text-xs text-white/40 underline underline-offset-4 hover:text-white/60"
+              disabled={refreshingM3u}
+              className="inline-flex items-center gap-1 text-xs text-white/40 underline underline-offset-4 hover:text-white/60 disabled:opacity-50 disabled:cursor-not-allowed"
               title={`Regenerate ${playlist.name}.m3u`}
             >
-              <RefreshCw className="h-3 w-3" />
-              Refresh M3U
+              <RefreshCw className={`h-3 w-3 ${refreshingM3u ? "animate-spin" : ""}`} />
+              {refreshingM3u ? "Refreshing…" : "Refresh M3U"}
             </button>
             <Link
               href={`/jobs?playlistId=${playlist.id}`}

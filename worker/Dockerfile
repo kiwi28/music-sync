@@ -41,10 +41,16 @@ RUN chmod +x /entrypoint.sh
 # Verify tools are available
 RUN spotdl --version && yt-dlp --version && ffmpeg -version
 
-# spotdl config/cache dir — persists OAuth tokens across restarts
-RUN mkdir -p /home/node/.spotdl && chown -R node:node /home/node
+# Create a shared user that matches the Next.js app container (uid 1001).
+# This ensures files written to the shared /music volume are owned by the
+# same uid in both containers — no permission errors, no umask hacks.
+RUN groupadd -g 1001 appgroup \
+ && useradd -u 1001 -g appgroup -m -d /home/node appuser \
+ && mkdir -p /home/node/.spotdl \
+ && chown -R appuser:appgroup /home/node
 
 # Create music dirs ahead of volume mount (ownership set at runtime)
-RUN mkdir -p /music/spotify /music/youtube_music
+RUN mkdir -p /music/spotify /music/youtube_music \
+ && chown appuser:appgroup /music/spotify /music/youtube_music
 
 ENTRYPOINT ["/entrypoint.sh"]
