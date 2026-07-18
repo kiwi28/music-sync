@@ -280,41 +280,113 @@ export function useFileBrowser() {
   );
 
   /**
-   * Compress one or more paths to a ZIP and trigger a browser download.
-   * POSTs to /api/files/compress, reads the streaming response as a blob,
-   * and creates a transient download link.
+   * Compress one or more paths to a ZIP with progress tracking.
+   *
+   * Returns `{ abort, done }`:
+   * - `abort()` cancels the compression and cleans up on the server.
+   * - `done` resolves to `true` when the ZIP has been downloaded, `false` on error/cancel.
+   * - `onProgress` receives percent (0–100) during compression.
    */
   const compressToZip = useCallback(
-    async (paths: string[]): Promise<boolean> => {
-      try {
-        const res = await fetch("/api/files/compress", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paths }),
-        });
+    (
+      paths: string[],
+      onProgress?: (percent: number) => void,
+    ): { abort: () => void; done: Promise<boolean> } => {
+      const ac = new AbortController();
+      let jobId: string | null = null;
 
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Compression failed");
+      const done = (async (): Promise<boolean> => {
+        try {
+          // 1. Start compression job
+          const res = await fetch("/api/files/compress", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paths }),
+            signal: ac.signal,
+          });
+
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || "Compression failed");
+          }
+
+          const body = await res.json();
+          jobId = body.jobId as string;
+
+          // 2. Poll for progress
+          let lastPct = 0;
+          while (!ac.signal.aborted) {
+            await new Promise((r) => setTimeout(r, 300));
+
+            const pRes = await fetch(
+              `/api/files/compress?jobId=${encodeURIComponent(jobId!)}`,
+              { signal: ac.signal },
+            );
+
+            if (!pRes.ok) throw new Error("Progress check failed");
+
+            const p = await pRes.json();
+
+            if (p.status === "error") {
+              throw new Error(p.error || "Compression failed");
+            }
+
+            if (p.status === "cancelled") return false;
+
+            if (p.percent !== lastPct) {
+              lastPct = p.percent;
+              onProgress?.(p.percent);
+            }
+
+            if (p.status === "ready") break;
+          }
+
+          if (ac.signal.aborted) return false;
+
+          // 3. Download the archive
+          onProgress?.(100);
+
+          const dlRes = await fetch(
+            `/api/files/compress/download?jobId=${encodeURIComponent(jobId!)}`,
+          );
+
+          if (!dlRes.ok) {
+            const data = await dlRes.json().catch(() => ({}));
+            throw new Error(data.error || "Download failed");
+          }
+
+          const blob = await dlRes.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "archive.zip";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          return true;
+        } catch (err) {
+          if (ac.signal.aborted) return false;
+          const msg =
+            err instanceof Error ? err.message : "Compression failed";
+          addToast("error", msg);
+          return false;
         }
+      })();
 
-        // Read the streaming response as a blob and trigger download
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "archive.zip";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        return true;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Compression failed";
-        addToast("error", msg);
-        return false;
-      }
+      return {
+        abort: () => {
+          ac.abort();
+          if (jobId) {
+            fetch(
+              `/api/files/compress?jobId=${encodeURIComponent(jobId)}`,
+              { method: "DELETE" },
+            ).catch(() => {});
+          }
+        },
+        done,
+      };
     },
     [addToast],
   );

@@ -8,6 +8,8 @@ import "./files.css";
 
 import { useFileBrowser } from "@/hooks/use-files";
 import { UploadDialog } from "@/components/files/upload-dialog";
+import { CompressDialog } from "@/components/files/compress-dialog";
+import type { CompressJob } from "@/components/files/compress-dialog";
 import { fileIconProvider } from "@/components/files/file-icons";
 import { RefreshCw, Upload, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
@@ -31,6 +33,8 @@ export default function FilesPage() {
 
   const [currentPath, setCurrentPath] = useState("/");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [compressDialogOpen, setCompressDialogOpen] = useState(false);
+  const [compressPaths, setCompressPaths] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<IEntity[] | null>(null);
@@ -207,29 +211,26 @@ export default function FilesPage() {
       const defaults = getMenuOptions(mode) as IFileMenuOption[];
 
       if (mode === "multiselect") {
-        // Capture selected IDs NOW while the menu is being built.
-        const state = apiRef.current?.getState();
-        console.log("[compress] getState()", JSON.stringify(state, null, 2));
-        const idx = state?.activePanel ?? 0;
-        const capturedIds: string[] = (() => {
-          const ids = state?.panels?.[idx]?.selected;
-          console.log("[compress] panels[%d].selected = %o", idx, ids);
-          if (ids && ids.length > 0) return ids as string[];
-          const entities = state?.panels?.[idx]?._selected;
-          console.log("[compress] panels[%d]._selected = %o", idx, entities);
-          if (entities && entities.length > 0)
-            return entities.map((e: { id: string }) => e.id);
-          return [];
-        })();
-
         return [
           ...defaults,
           {
             id: "compress",
             text: "Compress to ZIP",
             handler: () => {
-              if (capturedIds.length > 0) {
-                void compressToZip(capturedIds);
+              const state = apiRef.current?.getState();
+              const idx = state?.activePanel ?? 0;
+              const ids: string[] = (() => {
+                const s = state?.panels?.[idx]?.selected;
+                if (s && s.length > 0) return s as string[];
+                const e = state?.panels?.[idx]?._selected;
+                if (e && e.length > 0)
+                  return e.map((x: { id: string }) => x.id);
+                return [];
+              })();
+
+              if (ids.length > 0) {
+                setCompressPaths(ids);
+                setCompressDialogOpen(true);
               } else {
                 addToast("error", "No files selected");
               }
@@ -245,7 +246,8 @@ export default function FilesPage() {
             id: "compress",
             text: "Compress to ZIP",
             handler: () => {
-              void compressToZip([item.id]);
+              setCompressPaths([item.id]);
+              setCompressDialogOpen(true);
             },
           },
         ];
@@ -280,7 +282,8 @@ export default function FilesPage() {
           id: "compress",
           text: "Compress to ZIP",
           handler: () => {
-            void compressToZip([item.id]);
+            setCompressPaths([item.id]);
+            setCompressDialogOpen(true);
           },
         });
 
@@ -291,6 +294,15 @@ export default function FilesPage() {
       return defaults;
     },
     [compressToZip, unzipFile, browse, currentPath, addToast],
+  );
+
+  // ── Compress dialog start callback ─────────────────────
+
+  const handleCompressStart = useCallback(
+    (onProgress: (percent: number) => void): CompressJob => {
+      return compressToZip(compressPaths, onProgress);
+    },
+    [compressToZip, compressPaths],
   );
 
   // ── Custom toolbar actions ─────────────────────────────
@@ -406,6 +418,13 @@ export default function FilesPage() {
         open={uploadDialogOpen}
         onClose={() => setUploadDialogOpen(false)}
         onUpload={handleUploadComplete}
+      />
+
+      {/* Compress progress dialog */}
+      <CompressDialog
+        open={compressDialogOpen}
+        onClose={() => setCompressDialogOpen(false)}
+        onStart={handleCompressStart}
       />
     </div>
   );
