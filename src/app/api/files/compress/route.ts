@@ -13,50 +13,68 @@ import {
 } from "@/lib/compress-jobs";
 import archiver from "archiver";
 import { stat, readdir, open } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import { constants as fsConstants } from "node:fs";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
-import { PassThrough } from "node:stream";
 
 // ── Helpers ────────────────────────────────────────────
 
-/** Recursively sum file sizes under a path. Returns total bytes. */
-async function measureTotalBytes(rootPath: string): Promise<number> {
-  let total = 0;
-  const stack = [rootPath];
+interface FlatEntry {
+  /** Absolute path on disk. */
+  diskPath: string;
+  /** Path inside the zip archive (relative to the zip root). */
+  archivePath: string;
+  size: number;
+}
+
+/** Recursively walk a directory and return a flat list of every file. */
+async function walkFiles(
+  rootPath: string,
+  archiveRoot: string,
+): Promise<FlatEntry[]> {
+  const result: FlatEntry[] = [];
+  const stack: Array<{ diskPath: string; archivePath: string }> = [
+    { diskPath: rootPath, archivePath: archiveRoot },
+  ];
+
   while (stack.length > 0) {
-    const dir = stack.pop()!;
+    const { diskPath, archivePath } = stack.pop()!;
+    let entries;
     try {
-      const entries = await readdir(dir, { withFileTypes: true });
-      for (const e of entries) {
-        if (e.name.startsWith(".")) continue;
-        const full = join(dir, e.name);
-        if (e.isDirectory()) {
-          stack.push(full);
-        } else if (e.isFile()) {
-          // Use a fast stat — we only need size for files
-          const s = await stat(full).catch(() => null);
-          if (s) total += s.size;
+      entries = await readdir(diskPath, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const e of entries) {
+      if (e.name.startsWith(".")) continue;
+      const childDisk = join(diskPath, e.name);
+      const childArchive = `${archivePath}/${e.name}`;
+
+      if (e.isDirectory()) {
+        stack.push({ diskPath: childDisk, archivePath: childArchive });
+      } else if (e.isFile()) {
+        const s = await stat(childDisk).catch(() => null);
+        if (s) {
+          result.push({ diskPath: childDisk, archivePath: childArchive, size: s.size });
         }
       }
-    } catch {
-      // Permission errors etc. — skip
     }
   }
-  return total;
+
+  return result;
 }
 
 // ── POST: Start compression job ────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check
     const pb = await createServerClient();
     if (!pb.authStore.isValid || !pb.authStore.record) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Parse body
     const body = await request.json();
     const parsed = compressFilesSchema.safeParse(body);
     if (!parsed.success) {
@@ -66,7 +84,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate each path
+    // Validate paths
     const safePaths: string[] = [];
     for (const p of parsed.data.paths) {
       const safe = validatePath(p);
@@ -76,30 +94,41 @@ export async function POST(request: NextRequest) {
           { status: 403 },
         );
       }
-      try {
-        await stat(safe);
-      } catch {
-        return NextResponse.json(
-          { error: `Path "${p}" not found` },
-          { status: 404 },
-        );
+      try { await stat(safe); } catch {
+        return NextResponse.json({ error: `Path "${p}" not found` }, { status: 404 });
       }
       safePaths.push(safe);
     }
 
-    // Measure total bytes for progress tracking
-    let totalBytes = 0;
+    // Walk all paths to get a flat file list + count
+    let allFiles: FlatEntry[] = [];
     for (const p of safePaths) {
-      totalBytes += await measureTotalBytes(p);
+      const s = await stat(p);
+      if (s.isDirectory()) {
+        const files = await walkFiles(p, basename(p));
+        allFiles = allFiles.concat(files);
+      } else {
+        allFiles.push({ diskPath: p, archivePath: basename(p), size: s.size });
+      }
     }
 
-    // Create job bound to the authenticated user
-    const job = createJob(totalBytes, pb.authStore.record.id);
+    if (allFiles.length === 0) {
+      return NextResponse.json({ error: "No files to compress" }, { status: 400 });
+    }
+
+    const totalBytes = allFiles.reduce((sum, f) => sum + f.size, 0);
+
+    // Create job — total = file count for progress granularity
+    const job = createJob(allFiles.length, totalBytes, pb.authStore.record.id);
 
     // Build archive in background
-    buildArchive(job, safePaths);
+    buildArchive(job, allFiles);
 
-    return NextResponse.json({ jobId: job.id, totalBytes });
+    return NextResponse.json({
+      jobId: job.id,
+      totalFiles: allFiles.length,
+      totalBytes,
+    });
   } catch (err) {
     logApiError({ route: "files/compress", step: "POST" }, err);
     return apiErrorResponse(err, "Failed to start compression");
@@ -128,12 +157,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       status: job.status,
-      bytesWritten: job.bytesWritten,
+      filesProcessed: job.filesProcessed,
+      totalFiles: job.totalFiles,
       totalBytes: job.totalBytes,
-      percent:
-        job.totalBytes > 0
-          ? Math.round((job.bytesWritten / job.totalBytes) * 100)
-          : 0,
+      percent: job.totalFiles > 0
+        ? Math.round((job.filesProcessed / job.totalFiles) * 100)
+        : 0,
       error: job.error,
     });
   } catch (err) {
@@ -178,25 +207,10 @@ export async function DELETE(request: NextRequest) {
 
 async function buildArchive(
   job: ReturnType<typeof createJob>,
-  paths: string[],
+  allFiles: FlatEntry[],
 ) {
   try {
-    // Resolve path stats before starting the archive (can't await inside the stream pipeline)
-    const resolved: { path: string; name: string; isDir: boolean }[] = [];
-    for (const p of paths) {
-      if (job.abortController.signal.aborted) return;
-      const s = await stat(p).catch(() => null);
-      if (s) {
-        resolved.push({ path: p, name: basename(p), isDir: s.isDirectory() });
-      }
-    }
-
-    if (resolved.length === 0) {
-      markError(job.id, "No valid paths to compress");
-      return;
-    }
-
-    // Create temp file with restricted permissions (owner-only, 0o600)
+    // Create temp file (owner-only)
     const tmpPath = join(tmpdir(), `music-sync-archive-${job.id}.zip`);
     let fileHandle;
     try {
@@ -210,15 +224,6 @@ async function buildArchive(
       return;
     }
     const output = fileHandle.createWriteStream();
-
-    // Byte-counting pass-through: sits between archiver and file output
-    let bytesWritten = 0;
-    const byteCounter = new PassThrough();
-    byteCounter.on("data", (chunk: Buffer) => {
-      bytesWritten += chunk.length;
-      updateProgress(job.id, bytesWritten);
-    });
-
     const archive = archiver("zip", { zlib: { level: 1 } });
 
     // Handle abort
@@ -227,29 +232,47 @@ async function buildArchive(
       output.close();
     });
 
+    // Pipe archive → output (no byte-counter needed; we track by file count)
+    archive.pipe(output);
+
+    const totalFiles = allFiles.length;
+
+    // Add files ONE BY ONE, yielding the event loop after each so
+    // progress polls can observe intermediate states.
+    for (let i = 0; i < allFiles.length; i++) {
+      if (job.abortController.signal.aborted) break;
+
+      const f = allFiles[i];
+
+      // Use a promise wrapper around archive.file() to ensure each
+      // file is fully streamed before moving to the next.
+      await new Promise<void>((resolveFile, rejectFile) => {
+        const stream = createReadStream(f.diskPath);
+        stream.on("error", rejectFile);
+
+        // archive.append() takes a stream + metadata, then resolves
+        // when the entry is fully consumed.
+        archive.append(stream, { name: f.archivePath });
+        stream.on("end", () => {
+          // Yield to the event loop so the store write is visible
+          setImmediate(() => {
+            updateProgress(job.id, i + 1);
+            resolveFile();
+          });
+        });
+      });
+    }
+
+    if (job.abortController.signal.aborted) return;
+
+    // Finalize the archive (writes central directory)
     await new Promise<void>((resolve, reject) => {
       output.on("close", () => {
         if (job.abortController.signal.aborted) return;
         resolve();
       });
-
-      archive.on("error", (err: Error) => reject(err));
-      byteCounter.on("error", (err: Error) => reject(err));
-      output.on("error", (err: NodeJS.ErrnoException) => reject(err));
-
-      // Pipeline: archive → byte counter → file
-      archive.pipe(byteCounter);
-      byteCounter.pipe(output);
-
-      for (const { path, name, isDir } of resolved) {
-        if (job.abortController.signal.aborted) break;
-        if (isDir) {
-          archive.directory(path, name);
-        } else {
-          archive.file(path, { name });
-        }
-      }
-
+      output.on("error", reject);
+      archive.on("error", reject);
       archive.finalize();
     });
 

@@ -316,7 +316,7 @@ export function useFileBrowser() {
           // 2. Poll for progress
           let lastPct = 0;
           while (!ac.signal.aborted) {
-            await new Promise((r) => setTimeout(r, 300));
+            await new Promise((r) => setTimeout(r, 100));
 
             const pRes = await fetch(
               `/api/files/compress?jobId=${encodeURIComponent(jobId!)}`,

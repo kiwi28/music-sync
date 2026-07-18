@@ -11,10 +11,12 @@ export interface CompressJob {
   id: string;
   userId: string;
   status: CompressJobStatus;
-  /** Total bytes to write (sum of all file sizes). */
+  /** Total number of files to archive. */
+  totalFiles: number;
+  /** Files processed so far. */
+  filesProcessed: number;
+  /** Total bytes (sum of all file sizes) — informational only. */
   totalBytes: number;
-  /** Bytes written to the output stream so far. */
-  bytesWritten: number;
   archivePath: string | null;
   error: string | null;
   createdAt: number;
@@ -39,19 +41,23 @@ const cleanup = setInterval(() => {
   }
 }, 60_000);
 
-// Don't let the interval keep the process alive
 if (cleanup.unref) cleanup.unref();
 
 // ── Public API ─────────────────────────────────────────
 
-export function createJob(totalBytes: number, userId: string): CompressJob {
+export function createJob(
+  totalFiles: number,
+  totalBytes: number,
+  userId: string,
+): CompressJob {
   const id = randomUUID();
   const job: CompressJob = {
     id,
     userId,
     status: "building",
+    totalFiles,
+    filesProcessed: 0,
     totalBytes,
-    bytesWritten: 0,
     archivePath: null,
     error: null,
     createdAt: Date.now(),
@@ -72,9 +78,10 @@ export function getJobForUser(id: string, userId: string): CompressJob | null {
   return job;
 }
 
-export function updateProgress(id: string, bytesWritten: number): void {
+/** Update the count of files processed so far. */
+export function updateProgress(id: string, filesProcessed: number): void {
   const job = jobs.get(id);
-  if (job) job.bytesWritten = bytesWritten;
+  if (job) job.filesProcessed = filesProcessed;
 }
 
 export function markReady(id: string, archivePath: string): void {
