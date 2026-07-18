@@ -5,16 +5,16 @@ import { validatePath } from "@/lib/files";
 import { logApiError, apiErrorResponse } from "@/lib/api-errors";
 import {
   createJob,
-  getJob,
+  getJobForUser,
   updateProgress,
   markReady,
   markError,
   markCancelled,
 } from "@/lib/compress-jobs";
 import archiver from "archiver";
-import { stat, readdir } from "node:fs/promises";
+import { stat, readdir, open } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { basename, join } from "node:path";
-import { createWriteStream } from "node:fs";
 import { tmpdir } from "node:os";
 
 // ── Helpers ────────────────────────────────────────────
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
       totalEntries += await countEntries(p);
     }
 
-    // Create job
-    const job = createJob(totalEntries);
+    // Create job bound to the authenticated user
+    const job = createJob(totalEntries, pb.authStore.record.id);
 
     // Build archive in background
     buildArchive(job, safePaths);
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
     }
 
-    const job = getJob(jobId);
+    const job = getJobForUser(jobId, pb.authStore.record.id);
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
@@ -153,7 +153,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
     }
 
-    const job = getJob(jobId);
+    const job = getJobForUser(jobId, pb.authStore.record.id);
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
@@ -189,9 +189,20 @@ async function buildArchive(job: ReturnType<typeof createJob>, paths: string[]) 
       return;
     }
 
-    // Create temp file
+    // Create temp file with restricted permissions (owner-only, 0o600)
     const tmpPath = join(tmpdir(), `music-sync-archive-${job.id}.zip`);
-    const output = createWriteStream(tmpPath);
+    let fileHandle;
+    try {
+      fileHandle = await open(
+        tmpPath,
+        fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL,
+        0o600,
+      );
+    } catch {
+      markError(job.id, "Failed to create temporary file");
+      return;
+    }
+    const output = fileHandle.createWriteStream();
     const archive = archiver("zip", { zlib: { level: 1 } });
 
     let processed = 0;

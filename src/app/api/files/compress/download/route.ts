@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/pocketbase-server";
-import { getJob, removeJob } from "@/lib/compress-jobs";
+import { getJobForUser, removeJob } from "@/lib/compress-jobs";
 import { logApiError, apiErrorResponse } from "@/lib/api-errors";
-import { readFile } from "node:fs/promises";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 
 /**
  * GET /api/files/compress/download?jobId=...
@@ -24,7 +23,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
     }
 
-    const job = getJob(jobId);
+    const job = getJobForUser(jobId, pb.authStore.record.id);
     if (!job || job.status !== "ready" || !job.archivePath) {
       return NextResponse.json(
         { error: "Archive not ready or not found" },

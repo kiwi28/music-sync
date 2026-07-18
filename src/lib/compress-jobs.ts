@@ -9,6 +9,7 @@ export type CompressJobStatus = "building" | "ready" | "cancelled" | "error";
 
 export interface CompressJob {
   id: string;
+  userId: string;
   status: CompressJobStatus;
   totalEntries: number;
   processedEntries: number;
@@ -41,10 +42,11 @@ if (cleanup.unref) cleanup.unref();
 
 // ── Public API ─────────────────────────────────────────
 
-export function createJob(totalEntries: number): CompressJob {
+export function createJob(totalEntries: number, userId: string): CompressJob {
   const id = randomUUID();
   const job: CompressJob = {
     id,
+    userId,
     status: "building",
     totalEntries,
     processedEntries: 0,
@@ -59,6 +61,13 @@ export function createJob(totalEntries: number): CompressJob {
 
 export function getJob(id: string): CompressJob | undefined {
   return jobs.get(id);
+}
+
+/** Returns the job only if it belongs to the given user. `null` on mismatch or not found. */
+export function getJobForUser(id: string, userId: string): CompressJob | null {
+  const job = jobs.get(id);
+  if (!job || job.userId !== userId) return null;
+  return job;
 }
 
 export function updateProgress(id: string, processed: number): void {
