@@ -112,14 +112,6 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      const isAudio =
-        ALLOWED_MIME_TYPES.has(file.type) || hasAudioExtension(file.name);
-      if (!isAudio) {
-        return NextResponse.json(
-          { error: `File "${file.name}" is not an audio file` },
-          { status: 400 },
-        );
-      }
     }
 
     // ── Determine target directory and playlist ──
@@ -174,6 +166,7 @@ export async function POST(request: NextRequest) {
 
     // ── Write files and create PocketBase records ──
     let tracksAdded = 0;
+    let otherFiles = 0;
 
     for (const file of files) {
       try {
@@ -181,6 +174,15 @@ export async function POST(request: NextRequest) {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         const filePath = join(dirPath, file.name);
         await writeFile(filePath, fileBuffer);
+
+        const isAudio =
+          ALLOWED_MIME_TYPES.has(file.type) || hasAudioExtension(file.name);
+
+        if (!isAudio) {
+          // Non-audio file — just write to disk, skip track creation
+          otherFiles++;
+          continue;
+        }
 
         // Parse metadata from filename
         const { title, artist } = parseFilename(file.name);
@@ -232,13 +234,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Regenerate M3U ──
-    await generateM3u(dirPath, targetPlaylistName);
+    // ── Regenerate M3U (only if audio tracks were added) ──
+    if (tracksAdded > 0) {
+      await generateM3u(dirPath, targetPlaylistName);
+    }
 
     return NextResponse.json({
       success: true,
       playlistId: targetPlaylistId,
       tracksAdded,
+      otherFiles,
     });
   } catch (err) {
     logApiError({ route: "files/upload", step: "POST" }, err);

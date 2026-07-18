@@ -87,7 +87,7 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Upload Music</h2>
+          <h2 className="text-lg font-semibold">Upload Files</h2>
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
@@ -114,15 +114,14 @@ export function UploadDialog({ open, onClose, onUpload }: UploadDialogProps) {
         >
           <Upload className="mx-auto mb-2 h-8 w-8 text-white/30" />
           <p className="text-sm text-white/50">
-            Drop audio files here or click to browse
+            Drop files here or click to browse
           </p>
           <p className="mt-1 text-xs text-white/25">
-            MP3, FLAC, M4A, OGG, WAV, Opus
+            Any file type — audio, ZIP, images, etc.
           </p>
           <input
             ref={fileInputRef}
             type="file"
-            accept="audio/*"
             multiple
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
