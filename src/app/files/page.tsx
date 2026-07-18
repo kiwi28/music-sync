@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Filemanager, WillowDark, getMenuOptions } from "@svar-ui/react-filemanager";
-import type { IEntity } from "@svar-ui/react-filemanager";
+import type { IEntity, TContextMenuType } from "@svar-ui/react-filemanager";
 import "@svar-ui/react-filemanager/all.css";
 import "./files.css";
 
@@ -200,7 +200,7 @@ export default function FilesPage() {
    * Appends "Unzip here" only for .zip files.
    */
   const menuOptions = useCallback(
-    (mode: string, item: any) => {
+    (mode: TContextMenuType, item: any) => {
       const defaults = getMenuOptions(mode);
 
       if (mode === "multiselect") {

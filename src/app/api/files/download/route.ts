@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { validatePath } from "@/lib/files";
 import { logApiError, apiErrorResponse } from "@/lib/api-errors";
-import { access, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { basename } from "node:path";
 import { Readable } from "node:stream";
