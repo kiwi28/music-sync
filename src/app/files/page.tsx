@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Filemanager, WillowDark, getMenuOptions } from "@svar-ui/react-filemanager";
-import type { IEntity, TContextMenuType } from "@svar-ui/react-filemanager";
+import type { IEntity, TContextMenuType, IFileMenuOption } from "@svar-ui/react-filemanager";
 import "@svar-ui/react-filemanager/all.css";
 import "./files.css";
 
@@ -201,7 +201,10 @@ export default function FilesPage() {
    */
   const menuOptions = useCallback(
     (mode: TContextMenuType, item: any) => {
-      const defaults = getMenuOptions(mode);
+      // getMenuOptions returns IMenuOption[] from the store (no handler in type),
+      // but the actual runtime objects have handlers. Cast to IFileMenuOption[]
+      // which extends the react-menu IMenuOption that includes handler.
+      const defaults = getMenuOptions(mode) as IFileMenuOption[];
 
       if (mode === "multiselect") {
         return [
@@ -209,14 +212,15 @@ export default function FilesPage() {
           {
             id: "compress",
             text: "Compress to ZIP",
-            handler: async () => {
-              // SVAR only passes the right-clicked item as context.
-              // Use apiRef to get ALL selected items from the active panel.
+            handler: () => {
               const state = apiRef.current?.getState();
+              // activePanel is the panel index (0 or 1), not an object.
+              // Selected file IDs live under panels[index].selected.
+              const idx = state?.activePanel ?? 0;
               const selectedIds: string[] =
-                state?.activePanel?.selectedIds ?? [];
+                (state?.panels?.[idx]?.selected as string[]) ?? [];
               if (selectedIds.length > 0) {
-                await compressToZip(selectedIds);
+                void compressToZip(selectedIds);
               } else {
                 addToast("error", "No files selected");
               }
@@ -231,8 +235,8 @@ export default function FilesPage() {
           {
             id: "compress",
             text: "Compress to ZIP",
-            handler: async () => {
-              await compressToZip([item.id]);
+            handler: () => {
+              void compressToZip([item.id]);
             },
           },
         ];
@@ -247,15 +251,17 @@ export default function FilesPage() {
           items.push({
             id: "unzip",
             text: "Unzip here",
-            handler: async () => {
-              const ok = await unzipFile(item.id);
-              if (ok && apiRef.current) {
-                const entries = await browse(currentPath);
-                apiRef.current.exec("provide-data", {
-                  id: currentPath,
-                  data: entries,
-                });
-              }
+            handler: () => {
+              void unzipFile(item.id).then((ok) => {
+                if (ok && apiRef.current) {
+                  void browse(currentPath).then((entries) => {
+                    apiRef.current.exec("provide-data", {
+                      id: currentPath,
+                      data: entries,
+                    });
+                  });
+                }
+              });
             },
           });
         }
@@ -264,8 +270,8 @@ export default function FilesPage() {
         items.push({
           id: "compress",
           text: "Compress to ZIP",
-          handler: async () => {
-            await compressToZip([item.id]);
+          handler: () => {
+            void compressToZip([item.id]);
           },
         });
 

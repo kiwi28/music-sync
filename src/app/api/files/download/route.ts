@@ -3,9 +3,7 @@ import { createServerClient } from "@/lib/pocketbase-server";
 import { validatePath } from "@/lib/files";
 import { logApiError, apiErrorResponse } from "@/lib/api-errors";
 import { stat } from "node:fs/promises";
-import { createReadStream } from "node:fs";
 import { basename } from "node:path";
-import { Readable } from "node:stream";
 
 /** Map file extensions to MIME types for Content-Type headers. */
 const MIME_TYPES: Record<string, string> = {
