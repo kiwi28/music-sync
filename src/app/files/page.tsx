@@ -207,20 +207,29 @@ export default function FilesPage() {
       const defaults = getMenuOptions(mode) as IFileMenuOption[];
 
       if (mode === "multiselect") {
+        // Capture selected IDs NOW while the menu is being built.
+        const state = apiRef.current?.getState();
+        console.log("[compress] getState()", JSON.stringify(state, null, 2));
+        const idx = state?.activePanel ?? 0;
+        const capturedIds: string[] = (() => {
+          const ids = state?.panels?.[idx]?.selected;
+          console.log("[compress] panels[%d].selected = %o", idx, ids);
+          if (ids && ids.length > 0) return ids as string[];
+          const entities = state?.panels?.[idx]?._selected;
+          console.log("[compress] panels[%d]._selected = %o", idx, entities);
+          if (entities && entities.length > 0)
+            return entities.map((e: { id: string }) => e.id);
+          return [];
+        })();
+
         return [
           ...defaults,
           {
             id: "compress",
             text: "Compress to ZIP",
             handler: () => {
-              const state = apiRef.current?.getState();
-              // activePanel is the panel index (0 or 1), not an object.
-              // Selected file IDs live under panels[index].selected.
-              const idx = state?.activePanel ?? 0;
-              const selectedIds: string[] =
-                (state?.panels?.[idx]?.selected as string[]) ?? [];
-              if (selectedIds.length > 0) {
-                void compressToZip(selectedIds);
+              if (capturedIds.length > 0) {
+                void compressToZip(capturedIds);
               } else {
                 addToast("error", "No files selected");
               }
