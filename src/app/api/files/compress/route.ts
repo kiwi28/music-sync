@@ -232,35 +232,32 @@ async function buildArchive(
       output.close();
     });
 
-    // Pipe archive → output (no byte-counter needed; we track by file count)
+    // Pipe archive → output
     archive.pipe(output);
 
-    const totalFiles = allFiles.length;
+    // Track entry events: archiver fires one per file appended
+    let fileCount = 0;
+    archive.on("entry", () => {
+      fileCount++;
+      updateProgress(job.id, fileCount);
+    });
 
-    // Add files ONE BY ONE, yielding the event loop after each so
-    // progress polls can observe intermediate states.
-    for (let i = 0; i < allFiles.length; i++) {
+    // Add files one at a time with a micro-yield between each.
+    // archive.append() queues the file and returns immediately — archiver
+    // handles streaming in the background, so we don't block on each read.
+    for (const f of allFiles) {
       if (job.abortController.signal.aborted) break;
 
-      const f = allFiles[i];
-
-      // Use a promise wrapper around archive.file() to ensure each
-      // file is fully streamed before moving to the next.
-      await new Promise<void>((resolveFile, rejectFile) => {
-        const stream = createReadStream(f.diskPath);
-        stream.on("error", rejectFile);
-
-        // archive.append() takes a stream + metadata, then resolves
-        // when the entry is fully consumed.
-        archive.append(stream, { name: f.archivePath });
-        stream.on("end", () => {
-          // Yield to the event loop so the store write is visible
-          setImmediate(() => {
-            updateProgress(job.id, i + 1);
-            resolveFile();
-          });
-        });
+      const stream = createReadStream(f.diskPath);
+      stream.on("error", () => {
+        // If a file can't be read, skip it silently — archiver will
+        // see the error on the stream and skip the entry.
       });
+      archive.append(stream, { name: f.archivePath });
+
+      // Yield the event loop so pending polls can observe progress.
+      // This costs ~μs per file but guarantees visible increments.
+      await new Promise((r) => setImmediate(r));
     }
 
     if (job.abortController.signal.aborted) return;
