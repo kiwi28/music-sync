@@ -280,6 +280,76 @@ export function useFileBrowser() {
   );
 
   /**
+   * Compress one or more paths to a ZIP and trigger a browser download.
+   * POSTs to /api/files/compress, reads the streaming response as a blob,
+   * and creates a transient download link.
+   */
+  const compressToZip = useCallback(
+    async (paths: string[]): Promise<boolean> => {
+      try {
+        const res = await fetch("/api/files/compress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paths }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Compression failed");
+        }
+
+        // Read the streaming response as a blob and trigger download
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "archive.zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        return true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Compression failed";
+        addToast("error", msg);
+        return false;
+      }
+    },
+    [addToast],
+  );
+
+  /**
+   * Unzip a ZIP file in place (same directory).
+   * Returns true on success, false on failure.
+   */
+  const unzipFile = useCallback(
+    async (path: string): Promise<boolean> => {
+      try {
+        const res = await fetch("/api/files/unzip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Extraction failed");
+        }
+
+        const { extractedCount } = await res.json();
+        addToast("success", `Extracted ${extractedCount} file(s)`);
+        return true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Extraction failed";
+        addToast("error", msg);
+        return false;
+      }
+    },
+    [addToast],
+  );
+
+  /**
    * Upload files to a playlist.
    * Uses XMLHttpRequest instead of fetch to get upload progress events.
    */
@@ -358,5 +428,7 @@ export function useFileBrowser() {
     renameEntry,
     refreshM3u,
     uploadToPlaylist,
+    compressToZip,
+    unzipFile,
   };
 }

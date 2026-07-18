@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Filemanager, WillowDark } from "@svar-ui/react-filemanager";
+import { Filemanager, WillowDark, getMenuOptions } from "@svar-ui/react-filemanager";
 import type { IEntity } from "@svar-ui/react-filemanager";
 import "@svar-ui/react-filemanager/all.css";
 import "./files.css";
@@ -22,6 +22,8 @@ export default function FilesPage() {
     renameEntry,
     refreshM3u,
     uploadToPlaylist,
+    compressToZip,
+    unzipFile,
     setApi,
   } = useFileBrowser();
 
@@ -175,14 +177,105 @@ export default function FilesPage() {
   );
 
   const handleDownloadFile = useCallback(
-    async (ev: { id: string }) => {
+    (ev: { id: string }) => {
       const name = ev.id.split("/").filter(Boolean).pop() || ev.id;
-      addToast(
-        "info",
-        `Download not available via browser — use Navidrome to stream "${name}"`,
-      );
+      // Trigger a browser download via a transient <a> element.
+      // SVAR gives us the file id (path) — we pass it to the download API.
+      const url = `/api/files/download?path=${encodeURIComponent(ev.id)}`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     },
-    [addToast],
+    [],
+  );
+
+  // ── Context menu customisation ──────────────────────
+
+  /**
+   * Custom right-click context menu via SVAR's menuOptions prop.
+   * Appends "Compress to ZIP" for multiselect, files, and folders.
+   * Appends "Unzip here" only for .zip files.
+   */
+  const menuOptions = useCallback(
+    (mode: string, item: any) => {
+      const defaults = getMenuOptions(mode);
+
+      if (mode === "multiselect") {
+        return [
+          ...defaults,
+          {
+            id: "compress",
+            text: "Compress to ZIP",
+            handler: async () => {
+              // SVAR only passes the right-clicked item as context.
+              // Use apiRef to get ALL selected items from the active panel.
+              const state = apiRef.current?.getState();
+              const selectedIds: string[] =
+                state?.activePanel?.selectedIds ?? [];
+              if (selectedIds.length > 0) {
+                await compressToZip(selectedIds);
+              } else {
+                addToast("error", "No files selected");
+              }
+            },
+          },
+        ];
+      }
+
+      if (mode === "folder") {
+        return [
+          ...defaults,
+          {
+            id: "compress",
+            text: "Compress to ZIP",
+            handler: async () => {
+              await compressToZip([item.id]);
+            },
+          },
+        ];
+      }
+
+      if (mode === "file") {
+        const items = [...defaults];
+
+        // "Unzip here" for .zip files
+        const name: string = item?.name ?? "";
+        if (name.toLowerCase().endsWith(".zip")) {
+          items.push({
+            id: "unzip",
+            text: "Unzip here",
+            handler: async () => {
+              const ok = await unzipFile(item.id);
+              if (ok && apiRef.current) {
+                const entries = await browse(currentPath);
+                apiRef.current.exec("provide-data", {
+                  id: currentPath,
+                  data: entries,
+                });
+              }
+            },
+          });
+        }
+
+        // "Compress to ZIP" for any single file
+        items.push({
+          id: "compress",
+          text: "Compress to ZIP",
+          handler: async () => {
+            await compressToZip([item.id]);
+          },
+        });
+
+        return items;
+      }
+
+      // "body" and "add" modes — return defaults unchanged
+      return defaults;
+    },
+    [compressToZip, unzipFile, browse, currentPath, addToast],
   );
 
   // ── Custom toolbar actions ─────────────────────────────
@@ -280,6 +373,7 @@ export default function FilesPage() {
               mode="table"
               preview={false}
               icons={fileIconProvider}
+              menuOptions={menuOptions}
               onRequestData={handleRequestData}
               onCreateFile={handleCreateFile}
               onDeleteFiles={handleDeleteFiles}

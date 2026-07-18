@@ -89,6 +89,16 @@ export const refreshM3uSchema = z.object({
   message: "Either playlistId or path is required",
 });
 
+/** File browser: compress multiple paths to ZIP */
+export const compressFilesSchema = z.object({
+  paths: z.array(z.string().min(1)).min(1, "At least one path is required"),
+});
+
+/** File browser: unzip a file in place */
+export const unzipFileSchema = z.object({
+  path: z.string().min(1, "Path is required"),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type AddPlaylistInput = z.infer<typeof addPlaylistSchema>;
@@ -99,3 +109,5 @@ export type DeleteFileInput = z.infer<typeof deleteFileSchema>;
 export type MoveFileInput = z.infer<typeof moveFileSchema>;
 export type CopyFileInput = z.infer<typeof copyFileSchema>;
 export type RefreshM3uInput = z.infer<typeof refreshM3uSchema>;
+export type CompressFilesInput = z.infer<typeof compressFilesSchema>;
+export type UnzipFileInput = z.infer<typeof unzipFileSchema>;
