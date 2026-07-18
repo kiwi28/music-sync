@@ -11,8 +11,10 @@ export interface CompressJob {
   id: string;
   userId: string;
   status: CompressJobStatus;
-  totalEntries: number;
-  processedEntries: number;
+  /** Total bytes to write (sum of all file sizes). */
+  totalBytes: number;
+  /** Bytes written to the output stream so far. */
+  bytesWritten: number;
   archivePath: string | null;
   error: string | null;
   createdAt: number;
@@ -42,14 +44,14 @@ if (cleanup.unref) cleanup.unref();
 
 // ── Public API ─────────────────────────────────────────
 
-export function createJob(totalEntries: number, userId: string): CompressJob {
+export function createJob(totalBytes: number, userId: string): CompressJob {
   const id = randomUUID();
   const job: CompressJob = {
     id,
     userId,
     status: "building",
-    totalEntries,
-    processedEntries: 0,
+    totalBytes,
+    bytesWritten: 0,
     archivePath: null,
     error: null,
     createdAt: Date.now(),
@@ -70,9 +72,9 @@ export function getJobForUser(id: string, userId: string): CompressJob | null {
   return job;
 }
 
-export function updateProgress(id: string, processed: number): void {
+export function updateProgress(id: string, bytesWritten: number): void {
   const job = jobs.get(id);
-  if (job) job.processedEntries = processed;
+  if (job) job.bytesWritten = bytesWritten;
 }
 
 export function markReady(id: string, archivePath: string): void {
